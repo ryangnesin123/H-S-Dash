@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H&S Business Scorecard</title>
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23238636'/%3E%3Ctext x='16' y='22' font-family='Arial,sans-serif' font-size='16' font-weight='bold' fill='white' text-anchor='middle'%3EH%26S%3C/text%3E%3C/svg%3E">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1117;
+            color: #e1e4e8;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1d27 0%, #252a37 100%);
+            border-bottom: 1px solid #2d333b;
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #fff;
+            letter-spacing: -0.3px;
+        }
+
+        .header h1 span {
+            color: #58a6ff;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .sync-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #8b949e;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3fb950;
+            animation: pulse 2s infinite;
+        }
+
+        .sync-dot.error { background: #f85149; animation: none; }
+        .sync-dot.loading { background: #d29922; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn-refresh {
+            background: #21262d;
+            border: 1px solid #363b42;
+            color: #c9d1d9;
+            padding: 6px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+
+        .btn-refresh:hover {
+            background: #30363d;
+            border-color: #484f58;
+        }
+
+        .config-bar {
+            background: #161b22;
+            border-bottom: 1px solid #21262d;
+            padding: 12px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 13px;
+        }
+
+        .config-bar label {
+            color: #8b949e;
+        }
+
+        .config-bar input {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #c9d1d9;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 480px;
+        }
+
+        .config-bar input:focus {
+            outline: none;
+            border-color: #58a6ff;
+            box-shadow: 0 0 0 3px rgba(88,166,255,0.15);
+        }
+
+        .config-bar button {
+            background: #238636;
+            border: 1px solid #2ea043;
+            color: #fff;
+            padding: 6px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.15s;
+        }
+
+        .config-bar button:hover { background: #2ea043; }
+
+        .dashboard {
+            padding: 24px 32px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        .section {
+            background: #161b22;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            overflow: hidden;
+            transition: border-color 0.15s;
+        }
+
+        .section:hover { border-color: #30363d; }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+
+        .section-header:hover { background: #1c2129; }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #e1e4e8;
+        }
+
+        .section-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .chevron {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.2s;
+            color: #484f58;
+        }
+
+        .section.open .chevron { transform: rotate(180deg); }
+
+        .section-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+
+        .section.open .section-body {
+            max-height: 2000px;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .data-table thead th {
+            background: #0d1117;
+            padding: 8px 12px;
+            text-align: left;
+            font-weight: 600;
+            color: #8b949e;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .data-table thead th:not(:first-child) {
+            text-align: right;
+        }
+
+        .data-table tbody tr {
+            border-bottom: 1px solid #1b2028;
+            transition: background 0.1s;
+        }
+
+        .data-table tbody tr:hover { background: #1c2129; }
+        .data-table tbody tr:last-child { border-bottom: none; }
+
+        .data-table td {
+            padding: 9px 12px;
+            color: #c9d1d9;
+        }
+
+        .data-table td:not(:first-child):not(:nth-child(2)) {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .data-table td:nth-child(2) {
+            color: #8b949e;
+            font-size: 12px;
+        }
+
+        .metric-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .owner-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            background: #1f2937;
+            color: #8b949e;
+            border: 1px solid #30363d;
+        }
+
+        .val-positive { color: #3fb950; }
+        .val-negative { color: #f85149; }
+        .val-warning { color: #d29922; }
+        .val-neutral { color: #c9d1d9; }
+
+        /* Color accents per section */
+        .icon-blue { background: rgba(88,166,255,0.15); color: #58a6ff; }
+        .icon-green { background: rgba(63,185,80,0.15); color: #3fb950; }
+        .icon-purple { background: rgba(188,140,255,0.15); color: #bc8cff; }
+        .icon-orange { background: rgba(210,153,34,0.15); color: #d29922; }
+        .icon-red { background: rgba(248,81,73,0.15); color: #f85149; }
+        .icon-teal { background: rgba(57,211,183,0.15); color: #39d3b7; }
+        .icon-pink { background: rgba(219,127,183,0.15); color: #db7fb7; }
+
+        .loading-row td {
+            text-align: center !important;
+            color: #484f58;
+            padding: 20px;
+        }
+
+        .skeleton {
+            background: linear-gradient(90deg, #21262d 25%, #30363d 50%, #21262d 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 4px;
+            height: 14px;
+            display: inline-block;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .full-width { grid-column: 1 / -1; }
+
+        .last-updated {
+            text-align: center;
+            padding: 16px;
+            color: #484f58;
+            font-size: 12px;
+        }
+
+        @media (max-width: 1100px) {
+            .dashboard { grid-template-columns: 1fr; padding: 16px; }
+            .header { padding: 16px; }
+            .config-bar { flex-wrap: wrap; padding: 12px 16px; }
+            .config-bar input { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1><span>H&S</span> Business Scorecard</h1>
+        <div class="header-right">
+            <div class="sync-status">
+                <div class="sync-dot" id="syncDot"></div>
+                <span id="syncText">Connecting...</span>
+            </div>
+            <button class="btn-refresh" onclick="fetchData()">Refresh</button>
+        </div>
+    </div>
+
+    <div class="config-bar">
+        <label>Google Sheet URL:</label>
+        <input type="text" id="sheetUrl" placeholder="Paste your Google Sheets URL here (e.g. https://docs.google.com/spreadsheets/d/...)">
+        <button onclick="saveAndFetch()">Connect</button>
+        <span style="color:#484f58;font-size:12px;margin-left:4px;">Sheet must be shared: "Anyone with the link" can view</span>
+    </div>
+
+    <div class="dashboard" id="dashboard"></div>
+
+    <div class="last-updated" id="lastUpdated"></div>
+
+    <script>
+    // ─── SECTION DEFINITIONS (from your scorecard) ─────────────────────
+
+    const SECTIONS = [
+        {
+            id: 'amazon_pl',
+            title: 'Amazon P&L',
+            icon: '$',
+            iconClass: 'icon-blue',
+            metrics: [
+                { name: 'Sales $', owner: 'Rey', standard: '-' },
+                { name: 'ROI (b4 VC) %', owner: 'Rey', standard: '>40%' },
+                { name: 'NPM $', owner: 'Rey', standard: '-' },
+                { name: 'NPM %', owner: 'Rey', standard: '-' },
+                { name: 'Mexico %', owner: 'Rey', standard: '-' },
+                { name: 'Canada %', owner: 'Rey', standard: '-' },
+            ]
+        },
+        {
+            id: 'working_capital',
+            title: 'Working Capital',
+            icon: '\u{1F4B0}',
+            iconClass: 'icon-green',
+            metrics: [
+                { name: 'Inv Paid Not shipped', owner: 'Bob', standard: '-' },
+                { name: 'Prebook Deposits', owner: 'Jon', standard: '-' },
+                { name: 'Wtd Avg Payment to Ship Days', owner: 'Brenda', standard: '<14' },
+                { name: 'Cash Surplus/Short 2 weeks', owner: '-', standard: '-' },
+            ]
+        },
+        {
+            id: 'live_inventory',
+            title: 'Live Inventory',
+            icon: '\u{1F4E6}',
+            iconClass: 'icon-purple',
+            metrics: [
+                { name: 'Active FBA Inventory', owner: 'Rey', standard: '-' },
+                { name: 'Receiving FBA Inventory', owner: '-', standard: '-' },
+                { name: '% of Capital (Live + Receiving)', owner: 'Jon', standard: '>33%' },
+                { name: 'Ave Number of units per SKU', owner: 'Rey', standard: '<12' },
+                { name: "Number of Active SKU's", owner: '', standard: '' },
+            ]
+        },
+        {
+            id: 'returns_removal',
+            title: 'Returns & Removal Inventory',
+            icon: '\u{1F504}',
+            iconClass: 'icon-orange',
+            metrics: [
+                { name: 'Inventory At Axiom', owner: '', standard: '-' },
+                { name: 'Total Assets on balance sheet', owner: 'Mae', standard: '-' },
+                { name: 'Total Assets on per L10', owner: '', standard: '-' },
+            ]
+        },
+        {
+            id: 'live_inv_value',
+            title: 'Live Inventory Value',
+            icon: '\u{1F4B2}',
+            iconClass: 'icon-teal',
+            metrics: [
+                { name: 'Profit Estimate of Inventory', owner: 'Rey', standard: '' },
+                { name: 'ROI Estimate', owner: 'Rey', standard: '' },
+            ]
+        },
+        {
+            id: 'problem_listings',
+            title: 'Problem Listings',
+            icon: '\u{26A0}',
+            iconClass: 'icon-red',
+            metrics: [
+                { name: 'Active FBA but High Rank > 350k', owner: 'Maika', standard: '-' },
+                { name: 'Walmart (WFS) inventory ( cant sell FBA )', owner: '', standard: '-' },
+                { name: 'Stranded / Unfulfilliable FBA', owner: 'Maika', standard: '-' },
+                { name: 'Future coming next 45 days that is Gated', owner: 'Jon', standard: '' },
+            ]
+        },
+        {
+            id: 'inventory_turn',
+            title: 'Inventory Turn',
+            icon: '\u{1F503}',
+            iconClass: 'icon-blue',
+            metrics: [
+                { name: 'Turns p.a. of Instock Inventroy', owner: 'Bob', standard: '>7' },
+                { name: 'Capital Turns p.a', owner: 'Bob', standard: '>2.3' },
+            ]
+        },
+        {
+            id: 'storage_fees',
+            title: 'Storage Fees per Week',
+            icon: '\u{1F4CB}',
+            iconClass: 'icon-orange',
+            metrics: [
+                { name: 'Total Storage Fees p.w', owner: 'Mae', standard: '-' },
+                { name: 'FBA (excl Long Term)', owner: 'Mae', standard: '-' },
+                { name: 'FBA long Term', owner: 'Mae', standard: '-' },
+                { name: 'AWD', owner: 'Bob', standard: '-' },
+                { name: '3PL', owner: 'Bob', standard: '-' },
+                { name: '3PL Storage Cost Per Unit', owner: 'Bob', standard: '-' },
+            ]
+        },
+        {
+            id: 'ebay_sales',
+            title: 'eBay Sales',
+            icon: '\u{1F6D2}',
+            iconClass: 'icon-green',
+            metrics: [
+                { name: 'H&S Sales', owner: 'Bob', standard: '$0.00', csvKey: 'ebay_hs' },
+                { name: 'Axiom Sales', owner: 'Bob', standard: '-' },
+                { name: 'Axiom Sales % of $ listed', owner: '', standard: '-' },
+            ]
+        },
+        {
+            id: 'reimbursement',
+            title: 'Reimbursement',
+            icon: '\u{1F4B8}',
+            iconClass: 'icon-green',
+            metrics: [
+                { name: 'Cash + Inventory Reimbursed $', owner: 'Rey', standard: '-' },
+                { name: 'Cash + Inv Reimbursed %', owner: 'Rey', standard: '2.00%' },
+            ]
+        },
+        {
+            id: 'walmart_sales',
+            title: 'Walmart Sales',
+            icon: '\u{1F3EA}',
+            iconClass: 'icon-blue',
+            metrics: [
+                { name: 'H&S Sales', owner: 'Jon', standard: '-', csvKey: 'walmart_hs' },
+                { name: 'H&S Inventory Available', owner: 'Bob', standard: '-' },
+                { name: 'Badlands Sales', owner: 'Rey', standard: '-' },
+            ]
+        },
+        {
+            id: 'returns',
+            title: 'Returns',
+            icon: '\u{1F4E5}',
+            iconClass: 'icon-red',
+            metrics: [
+                { name: '% of our Sales returned', owner: 'Rey', standard: '<18%' },
+                { name: '% of Returns that Amazon deems Sellable', owner: 'Rey', standard: '>10%' },
+                { name: '% of sellable returns sent back to FBA', owner: 'Bob', standard: '>35%' },
+            ]
+        },
+        {
+            id: 'account_health',
+            title: 'Account Health',
+            icon: '\u{1F3E5}',
+            iconClass: 'icon-green',
+            metrics: [
+                { name: 'Account Health', owner: 'Rey', standard: '> 440' },
+                { name: 'Notifications', owner: 'Rey', standard: '-' },
+                { name: 'IPI Score', owner: 'Rey', standard: '> 450' },
+            ]
+        },
+        {
+            id: 'buying',
+            title: 'Buying',
+            icon: '\u{1F6D2}',
+            iconClass: 'icon-purple',
+            metrics: [
+                { name: 'Dollar Value to buy next 12 weeks', owner: 'Jon', standard: '' },
+                { name: "PO's placed this week", owner: '', standard: '' },
+                { name: 'Year To Date Cancelled POs', owner: '', standard: '$1,520,000' },
+                { name: 'Prebooks % of Prepaid Inventory', owner: '', standard: '35-65%' },
+                { name: 'Prebooks % of Value Upcoming 90 Days', owner: 'Bob', standard: '35-65%' },
+            ]
+        },
+        {
+            id: 'sellersnap',
+            title: 'SellerSnap Pricing',
+            icon: '\u{1F3AF}',
+            iconClass: 'icon-teal',
+            metrics: [
+                { name: 'buy box % ( instock + active )', owner: 'Rey', standard: '>15%' },
+                { name: 'Non Competitive Active Stock %', owner: 'Rey', standard: '<25%' },
+                { name: 'Selling at Max % of Active Stock', owner: 'Rey', standard: '5-15%' },
+                { name: 'Needs to reprice stock value', owner: 'Rey', standard: '-' },
+                { name: 'Deactivated Stock Value', owner: 'Rey', standard: '<2,500' },
+            ]
+        },
+        {
+            id: 'ageing_inventory',
+            title: 'Ageing Inventory',
+            icon: '\u{23F3}',
+            iconClass: 'icon-orange',
+            metrics: [
+                { name: '181 - 270 days', owner: 'Rey', standard: '<10%' },
+                { name: '271 - 365 days', owner: 'Rey', standard: '<2%' },
+                { name: '365+ days', owner: 'Rey', standard: '<.5%' },
+            ]
+        },
+        {
+            id: 'avg_roce',
+            title: 'Average ROCE',
+            icon: '\u{1F4C8}',
+            iconClass: 'icon-green',
+            metrics: [
+                { name: 'Average ROCE', owner: '-', standard: '>25%' },
+            ]
+        },
+        {
+            id: 'assets',
+            title: 'Assets',
+            icon: '\u{1F3E6}',
+            iconClass: 'icon-blue',
+            metrics: [
+                { name: 'Active Stock at Amazon', owner: 'Rey', standard: '' },
+                { name: 'Damaged/Defective Stock at Amazon (LESS THE PROVISION)', owner: 'Rey', standard: '' },
+                { name: 'On the way to Amazon', owner: '-', standard: '' },
+                { name: 'Paid but not shipped', owner: 'Jon', standard: '' },
+                { name: 'Prebooked Payments made (Include deposits)', owner: 'Jon', standard: '' },
+                { name: 'Stock AWD', owner: 'Bob', standard: '' },
+                { name: 'On the way to AWD', owner: 'Bob', standard: '' },
+                { name: 'Stock WFS', owner: 'Bob', standard: '' },
+                { name: 'On the way to WFS', owner: 'Bob', standard: '' },
+                { name: 'Removals at UPSTATE', owner: 'Rey', standard: '' },
+                { name: 'Removals at AXIOM', owner: 'Rey', standard: '' },
+                { name: 'Stock live on Ebay(Price on Ebay)', owner: 'Rey', standard: '' },
+                { name: 'A/R + Reserve', owner: 'Tessa', standard: '' },
+                { name: 'Cash', owner: 'Tessa', standard: '' },
+                { name: 'Estimated Value of Lost Units for Reimbursement', owner: 'Rey', standard: '' },
+                { name: 'Open Balance-Supplier Credits (supplier owes us $)', owner: 'Mae', standard: '' },
+                { name: 'Stranded Inventory (at FBA but unable to sell)', owner: 'Maika', standard: '' },
+                { name: 'Grade and Resell Amazon Program- Used Stock UNITS', owner: 'Rey', standard: '' },
+                { name: 'Grade and Resell Amazon Program- Used Stock VALUE', owner: 'Rey', standard: '' },
+                { name: 'Loan to Shareholder', owner: 'Mae', standard: '' },
+                { name: 'TOTAL', owner: '', standard: '' },
+            ]
+        },
+        {
+            id: 'rank_category',
+            title: 'Weighted Avg Rank Per Category',
+            icon: '\u{1F3C6}',
+            iconClass: 'icon-pink',
+            customHeaders: ['Category', 'Owner', 'Inv Value', 'Last Week', '4 Wk Avg'],
+            metrics: [
+                { name: 'Home', owner: 'Rey', standard: '' },
+                { name: 'fashion', owner: 'Rey', standard: '' },
+                { name: 'pet', owner: 'Rey', standard: '' },
+                { name: 'beauty', owner: 'Rey', standard: '' },
+                { name: 'sports', owner: 'Rey', standard: '' },
+                { name: 'kitchen', owner: 'Rey', standard: '' },
+                { name: 'baby', owner: 'Rey', standard: '' },
+                { name: 'toy', owner: 'Rey', standard: '' },
+                { name: 'video', owner: 'Rey', standard: '' },
+            ]
+        },
+    ];
+
+    // ─── RENDERING ─────────────────────────────────────────────────────
+
+    const dashboard = document.getElementById('dashboard');
+
+    function renderSections() {
+        dashboard.innerHTML = '';
+        SECTIONS.forEach((section, idx) => {
+            const div = document.createElement('div');
+            div.className = 'section';
+            div.id = `section-${section.id}`;
+            const headers = section.customHeaders || ['Metric', 'Owner', 'Standard', 'Last Week', '4 Wk Avg', '12 Mth Avg'];
+            const colCount = headers.length;
+            div.innerHTML = `
+                <div class="section-header" onclick="toggleSection('${section.id}')">
+                    <div class="section-title">
+                        <div class="section-icon ${section.iconClass}">${section.icon}</div>
+                        ${section.title}
+                    </div>
+                    <svg class="chevron" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/>
+                    </svg>
+                </div>
+                <div class="section-body">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                ${headers.map(h => `<th>${h}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${section.id}">
+                            ${section.metrics.map(m => {
+                                const dataCols = colCount - 3; // columns after Metric, Owner, Standard/InvValue
+                                return `
+                                <tr>
+                                    <td><div class="metric-name">${m.name}</div></td>
+                                    <td>${m.owner ? `<span class="owner-badge">${m.owner}</span>` : ''}</td>
+                                    <td style="text-align:right">${m.standard || '-'}</td>
+                                    ${Array(dataCols).fill('<td class="val-neutral">-</td>').join('')}
+                                </tr>`;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            dashboard.appendChild(div);
+        });
+    }
+
+    function toggleSection(id) {
+        const el = document.getElementById(`section-${id}`);
+        el.classList.toggle('open');
+    }
+
+    // ─── GOOGLE SHEETS INTEGRATION ─────────────────────────────────────
+    //
+    // HOW TO CONNECT:
+    //   1. Open your Google Sheet
+    //   2. File > Share > Publish to Web > choose CSV > Publish
+    //   3. Paste the published CSV URL here
+    //   OR
+    //   4. Use the Google Sheets API with your Sheet ID
+    //      Format: https://docs.google.com/spreadsheets/d/SHEET_ID/gviz/tq?tqx=out:csv
+    //   OR
+    //   5. Just paste the Sheet ID and we'll build the URL
+    // ───────────────────────────────────────────────────────────────────
+
+    function getSheetUrl() {
+        const raw = document.getElementById('sheetUrl').value.trim();
+        if (!raw) return null;
+
+        // If it's already a full published CSV URL, use as-is
+        if (raw.includes('/pub') && raw.includes('output=csv')) {
+            return raw;
+        }
+
+        // If it's a gviz URL, use as-is
+        if (raw.includes('gviz/tq')) {
+            return raw;
+        }
+
+        // Extract sheet ID and optional gid from any Google Sheets URL
+        const idMatch = raw.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        const gidMatch = raw.match(/gid=(\d+)/);
+
+        let sheetId = null;
+        let gid = null;
+
+        if (idMatch) {
+            sheetId = idMatch[1];
+            gid = gidMatch ? gidMatch[1] : '0';
+        } else if (/^[a-zA-Z0-9_-]{20,}$/.test(raw)) {
+            sheetId = raw;
+            gid = '0';
+        }
+
+        if (sheetId) {
+            // Use the export URL format which supports CORS better
+            return `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=${gid}`;
+        }
+
+        return raw;
+    }
+
+    function parseCSV2D(text) {
+        const lines = [];
+        let currentLine = [];
+        let current = '';
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const ch = text[i];
+            if (ch === '"') {
+                if (inQuotes && text[i + 1] === '"') {
+                    current += '"';
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (ch === ',' && !inQuotes) {
+                currentLine.push(current.trim());
+                current = '';
+            } else if ((ch === '\n' || ch === '\r') && !inQuotes) {
+                if (ch === '\r' && text[i + 1] === '\n') i++;
+                currentLine.push(current.trim());
+                lines.push(currentLine);
+                currentLine = [];
+                current = '';
+            } else {
+                current += ch;
+            }
+        }
+        if (current || currentLine.length > 0) {
+            currentLine.push(current.trim());
+            lines.push(currentLine);
+        }
+        return lines;
+    }
+
+    // Map spreadsheet rows to our section metrics.
+    // The spreadsheet has a two-column layout:
+    //   Left:  col 1=Owner, 2=Metric, 3=Standard, 4=LastWeek, 5=4WkAvg, 6=12MthAvg
+    //   Right: col 7=Owner, 8=Metric, 9=Standard, 10=LastWeek, 11=4WkAvg, 12=12MthAvg
+    function mapDataToSections(rows) {
+        // Build lookups. We store all left-side and right-side entries separately,
+        // then also a combined lookup for metrics that only appear once.
+        const leftLookup = {};
+        const rightLookup = {};
+
+        // Track which "section header" we're under on each side, for context
+        let leftSection = '';
+        let rightSection = '';
+
+        for (const row of rows) {
+            if (!row || row.length < 7) continue;
+
+            const leftMetric = (row[2] || '').trim();
+            const rightMetric = row.length >= 13 ? (row[8] || '').trim() : '';
+
+            // Detect section headers (metric name in col C or I with no data in the value cols)
+            const leftHasData = (row[4] || '').trim() || (row[5] || '').trim() || (row[6] || '').trim();
+            const rightHasData = row.length >= 13 ? ((row[10] || '').trim() || (row[11] || '').trim() || (row[12] || '').trim()) : false;
+
+            if (leftMetric && !leftHasData && !(row[3] || '').trim()) {
+                leftSection = leftMetric.toLowerCase();
+            }
+            if (rightMetric && !rightHasData && !(row[9] || '').trim()) {
+                rightSection = rightMetric.toLowerCase();
+            }
+
+            // Left side data rows
+            if (leftMetric && !leftMetric.startsWith('=') && (leftHasData || (row[3] || '').trim())) {
+                const key = leftMetric.toLowerCase();
+                leftLookup[key] = {
+                    lastWeek: (row[4] || '').trim(),
+                    fourWkAvg: (row[5] || '').trim(),
+                    twelveMthAvg: (row[6] || '').trim(),
+                    standard: (row[3] || '').trim(),
+                    section: leftSection
+                };
+            }
+
+            // Right side data rows
+            if (row.length >= 13 && rightMetric && !rightMetric.startsWith('=') && (rightHasData || (row[9] || '').trim())) {
+                const key = rightMetric.toLowerCase();
+                rightLookup[key] = {
+                    lastWeek: (row[10] || '').trim(),
+                    fourWkAvg: (row[11] || '').trim(),
+                    twelveMthAvg: (row[12] || '').trim(),
+                    standard: (row[9] || '').trim(),
+                    section: rightSection
+                };
+            }
+        }
+
+        // Now update each section's metrics
+        SECTIONS.forEach(section => {
+            const tbody = document.getElementById(`tbody-${section.id}`);
+            if (!tbody) return;
+
+            const trs = tbody.querySelectorAll('tr');
+            const isRankSection = section.id === 'rank_category';
+
+            section.metrics.forEach((metric, i) => {
+                if (!trs[i]) return;
+                const key = metric.name.toLowerCase();
+                const tds = trs[i].querySelectorAll('td');
+
+                // For metrics with a csvKey (disambiguating duplicates like H&S Sales),
+                // use section context to pick the right lookup
+                let data = null;
+                if (metric.csvKey === 'ebay_hs') {
+                    data = leftLookup[key] && leftLookup[key].section.includes('ebay') ? leftLookup[key] : null;
+                } else if (metric.csvKey === 'walmart_hs') {
+                    data = leftLookup[key] && leftLookup[key].section.includes('walmart') ? leftLookup[key] : null;
+                    if (!data) data = rightLookup[key] && rightLookup[key].section.includes('walmart') ? rightLookup[key] : null;
+                } else {
+                    // Try left first, then right
+                    data = leftLookup[key] || rightLookup[key];
+                }
+
+                if (isRankSection) {
+                    // Rank section: col 2=standard(inv value), col 3=lastWeek, col 4=4wkAvg (only 5 cols)
+                    if (data) {
+                        tds[2].textContent = formatValue(data.standard);
+                        tds[3].textContent = formatValue(data.lastWeek);
+                        tds[3].className = 'val-neutral';
+                        tds[4].textContent = formatValue(data.fourWkAvg);
+                        tds[4].className = 'val-neutral';
+                    }
+                } else {
+                    // Standard 6-column layout
+                    if (data) {
+                        tds[3].textContent = formatValue(data.lastWeek);
+                        tds[3].className = 'val-neutral';
+                        tds[4].textContent = formatValue(data.fourWkAvg);
+                        tds[4].className = 'val-neutral';
+                        tds[5].textContent = formatValue(data.twelveMthAvg);
+                        tds[5].className = 'val-neutral';
+                    } else {
+                        tds[3].textContent = '-';
+                        tds[4].textContent = '-';
+                        tds[5].textContent = '-';
+                    }
+                }
+            });
+        });
+    }
+
+    function formatValue(val) {
+        if (!val) return '-';
+        val = val.trim();
+        if (val === '-' || val === 'N/A' || val === '#N/A' || val === '#REF!' || val === '#DIV/0!' || val === '#VALUE!') return val;
+
+        // If it already has $ or % formatting, display as-is from the spreadsheet
+        if (val.includes('$') || val.includes('%')) return val;
+
+        // Plain number — just return as-is (the spreadsheet handles formatting)
+        return val;
+    }
+
+    function getValueClass(val, standard) {
+        if (!val || val === '-' || val === 'N/A') return 'val-neutral';
+        // Simple heuristic - could be expanded based on business rules
+        return 'val-neutral';
+    }
+
+    async function fetchData() {
+        const url = getSheetUrl();
+        const dot = document.getElementById('syncDot');
+        const statusText = document.getElementById('syncText');
+
+        if (!url) {
+            dot.className = 'sync-dot error';
+            statusText.textContent = 'No sheet connected';
+            return;
+        }
+
+        dot.className = 'sync-dot loading';
+        statusText.textContent = 'Fetching data...';
+
+        try {
+            let csv = null;
+
+            // Try direct fetch first (works if hosted on a web server or sheet is published)
+            try {
+                const resp = await fetch(url, { redirect: 'follow' });
+                if (resp.ok) {
+                    csv = await resp.text();
+                }
+            } catch (e) {
+                // CORS error — expected when opening from file://
+            }
+
+            // If direct fetch failed, use a CORS proxy
+            if (!csv) {
+                statusText.textContent = 'Using proxy...';
+                const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(url);
+                const resp = await fetch(proxyUrl, { redirect: 'follow' });
+                if (!resp.ok) throw new Error(`HTTP ${resp.status} — Make sure the sheet is shared (anyone with link can view)`);
+                csv = await resp.text();
+            }
+
+            // Check if we got an HTML page instead of CSV (auth/permission issue)
+            if (csv.trim().startsWith('<!') || csv.trim().startsWith('<html')) {
+                throw new Error('Sheet is not publicly accessible. Share it with "Anyone with the link" can view.');
+            }
+
+            const rows = parseCSV2D(csv);
+            mapDataToSections(rows);
+
+            dot.className = 'sync-dot';
+            statusText.textContent = `Live · ${new Date().toLocaleTimeString()}`;
+            document.getElementById('lastUpdated').textContent = `Last updated: ${new Date().toLocaleString()}`;
+
+            // Save URL for next time
+            localStorage.setItem('hs_sheet_url', url);
+            localStorage.setItem('hs_sheet_input', document.getElementById('sheetUrl').value);
+        } catch (err) {
+            console.error('Fetch error:', err);
+            dot.className = 'sync-dot error';
+            statusText.textContent = `Error: ${err.message}`;
+        }
+    }
+
+    function saveAndFetch() {
+        const input = document.getElementById('sheetUrl').value.trim();
+        if (input) {
+            localStorage.setItem('hs_sheet_input', input);
+        }
+        fetchData();
+    }
+
+    // ─── AUTO-REFRESH ─────────────────────────────────────────────────
+
+    let refreshInterval;
+
+    function startAutoRefresh(seconds = 300) {
+        if (refreshInterval) clearInterval(refreshInterval);
+        refreshInterval = setInterval(fetchData, seconds * 1000);
+    }
+
+    // ─── INIT ─────────────────────────────────────────────────────────
+
+    renderSections();
+
+    // Restore saved sheet URL
+    const savedInput = localStorage.getItem('hs_sheet_input');
+    if (savedInput) {
+        document.getElementById('sheetUrl').value = savedInput;
+        fetchData();
+        startAutoRefresh();
+    } else {
+        document.getElementById('syncDot').className = 'sync-dot error';
+        document.getElementById('syncText').textContent = 'No sheet connected';
+    }
+    </script>
+</body>
+</html>
