@@ -923,18 +923,15 @@
 
     // ─── INIT ─────────────────────────────────────────────────────────
 
+    const DEFAULT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/1eTLV44GPME6rsIAp-KRlpi9B2-zawhGqUPOOFfZcCME/edit?gid=638091295#gid=638091295';
+
     renderSections();
 
-    // Restore saved sheet URL
-    const savedInput = localStorage.getItem('hs_sheet_input');
-    if (savedInput) {
-        document.getElementById('sheetUrl').value = savedInput;
-        fetchData();
-        startAutoRefresh();
-    } else {
-        document.getElementById('syncDot').className = 'sync-dot error';
-        document.getElementById('syncText').textContent = 'No sheet connected';
-    }
+    // Restore saved sheet URL, or use default
+    const savedInput = localStorage.getItem('hs_sheet_input') || DEFAULT_SHEET_URL;
+    document.getElementById('sheetUrl').value = savedInput;
+    fetchData();
+    startAutoRefresh();
     </script>
 </body>
 </html>
