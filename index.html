@@ -262,6 +262,25 @@
         .val-warning { color: #d29922; }
         .val-neutral { color: #c9d1d9; }
 
+        .critical-row {
+            background: rgba(248, 81, 73, 0.06);
+            border-left: 3px solid #f85149;
+        }
+        .critical-row:hover { background: rgba(248, 81, 73, 0.1); }
+        .critical-badge {
+            display: inline-block;
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 9px;
+            font-weight: 700;
+            background: rgba(248, 81, 73, 0.15);
+            color: #f85149;
+            border: 1px solid rgba(248, 81, 73, 0.3);
+            margin-left: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         /* Color accents per section */
         .icon-blue { background: rgba(88,166,255,0.15); color: #58a6ff; }
         .icon-green { background: rgba(63,185,80,0.15); color: #3fb950; }
@@ -415,6 +434,7 @@
             metrics: [
                 { name: 'Turns p.a. of Instock Inventroy', owner: 'Bob', standard: '>7' },
                 { name: 'Capital Turns p.a', owner: 'Bob', standard: '>2.3' },
+                { name: 'Capital Ineffeciency in days', owner: '', standard: '<100', critical: true },
             ]
         },
         {
@@ -611,10 +631,12 @@
                         </thead>
                         <tbody id="tbody-${section.id}">
                             ${section.metrics.map(m => {
-                                const dataCols = colCount - 3; // columns after Metric, Owner, Standard/InvValue
+                                const dataCols = colCount - 3;
+                                const rowClass = m.critical ? ' class="critical-row"' : '';
+                                const badge = m.critical ? '<span class="critical-badge">Critical</span>' : '';
                                 return `
-                                <tr>
-                                    <td><div class="metric-name">${m.name}</div></td>
+                                <tr${rowClass}>
+                                    <td><div class="metric-name">${m.name}${badge}</div></td>
                                     <td>${m.owner ? `<span class="owner-badge">${m.owner}</span>` : ''}</td>
                                     <td style="text-align:right">${m.standard || '-'}</td>
                                     ${Array(dataCols).fill('<td class="val-neutral">-</td>').join('')}
