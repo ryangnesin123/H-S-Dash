@@ -824,11 +824,11 @@
                 }
 
                 // Get the standard to compare against.
-                // Prefer the hardcoded standard (has comparison operators like >7, <12)
-                // Fall back to CSV standard only if hardcoded is empty/dash
+                // Prefer CSV standard (live from Google Sheet) so any sheet changes auto-update
+                // Fall back to hardcoded standard only if CSV has no meaningful value
                 const hardStd = metric.standard;
                 const csvStd = data ? data.standard : '';
-                const std = (hardStd && hardStd !== '-') ? hardStd : csvStd;
+                const std = (csvStd && csvStd !== '-' && csvStd.toString().trim() !== '') ? csvStd : hardStd;
 
                 if (isRankSection) {
                     // Rank section: col 2=standard(inv value), col 3=lastWeek, col 4=4wkAvg (only 5 cols)
@@ -842,6 +842,10 @@
                 } else {
                     // Standard 6-column layout
                     if (data) {
+                        // Dynamically update the Standard column from CSV
+                        if (csvStd && csvStd !== '-' && csvStd.toString().trim() !== '') {
+                            tds[2].textContent = formatValue(csvStd);
+                        }
                         tds[3].textContent = formatValue(data.lastWeek);
                         tds[3].className = getValueClass(data.lastWeek, std);
                         tds[4].textContent = formatValue(data.fourWkAvg);
