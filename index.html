@@ -822,6 +822,9 @@
                     data = leftLookup[key] || rightLookup[key];
                 }
 
+                // Get the standard to compare against (from CSV data or hardcoded)
+                const std = data ? (data.standard || metric.standard) : metric.standard;
+
                 if (isRankSection) {
                     // Rank section: col 2=standard(inv value), col 3=lastWeek, col 4=4wkAvg (only 5 cols)
                     if (data) {
@@ -835,11 +838,11 @@
                     // Standard 6-column layout
                     if (data) {
                         tds[3].textContent = formatValue(data.lastWeek);
-                        tds[3].className = 'val-neutral';
+                        tds[3].className = getValueClass(data.lastWeek, std);
                         tds[4].textContent = formatValue(data.fourWkAvg);
-                        tds[4].className = 'val-neutral';
+                        tds[4].className = getValueClass(data.fourWkAvg, std);
                         tds[5].textContent = formatValue(data.twelveMthAvg);
-                        tds[5].className = 'val-neutral';
+                        tds[5].className = getValueClass(data.twelveMthAvg, std);
                     } else {
                         tds[3].textContent = '-';
                         tds[4].textContent = '-';
@@ -863,8 +866,44 @@
     }
 
     function getValueClass(val, standard) {
-        if (!val || val === '-' || val === 'N/A') return 'val-neutral';
-        // Simple heuristic - could be expanded based on business rules
+        if (!val || val === '-' || val === 'N/A' || val === '#N/A' || val === '#VALUE!' || val === '#DIV/0!' || val === '#REF!') return 'val-neutral';
+        if (!standard || standard === '-' || standard === '' || standard === 'N/A') return 'val-neutral';
+
+        // Parse a numeric value from a string (strip $, %, commas, spaces)
+        function parseNum(s) {
+            if (!s) return NaN;
+            s = s.toString().replace(/[$,%,\s]/g, '').trim();
+            return parseFloat(s);
+        }
+
+        const numVal = parseNum(val);
+        if (isNaN(numVal)) return 'val-neutral';
+
+        const std = standard.trim();
+
+        // Pattern: ">X" — value should be greater than X to be green
+        if (std.startsWith('>')) {
+            const target = parseNum(std.slice(1));
+            if (!isNaN(target)) return numVal >= target ? 'val-positive' : 'val-negative';
+        }
+
+        // Pattern: "<X" — value should be less than X to be green
+        if (std.startsWith('<')) {
+            const target = parseNum(std.slice(1));
+            if (!isNaN(target)) return numVal <= target ? 'val-positive' : 'val-negative';
+        }
+
+        // Pattern: "X-Y" range (e.g. "5-15%", "35-65%") — value inside range is green
+        const rangeMatch = std.match(/^([\d.]+)\s*-\s*([\d.]+)(%?)$/);
+        if (rangeMatch) {
+            const lo = parseFloat(rangeMatch[1]);
+            const hi = parseFloat(rangeMatch[2]);
+            if (!isNaN(lo) && !isNaN(hi)) {
+                // If the standard has %, compare as-is since val is already in % form
+                return (numVal >= lo && numVal <= hi) ? 'val-positive' : 'val-negative';
+            }
+        }
+
         return 'val-neutral';
     }
 
