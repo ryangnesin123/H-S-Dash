@@ -822,8 +822,12 @@
                     data = leftLookup[key] || rightLookup[key];
                 }
 
-                // Get the standard to compare against (from CSV data or hardcoded)
-                const std = data ? (data.standard || metric.standard) : metric.standard;
+                // Get the standard to compare against.
+                // Prefer the hardcoded standard (has comparison operators like >7, <12)
+                // Fall back to CSV standard only if hardcoded is empty/dash
+                const hardStd = metric.standard;
+                const csvStd = data ? data.standard : '';
+                const std = (hardStd && hardStd !== '-') ? hardStd : csvStd;
 
                 if (isRankSection) {
                     // Rank section: col 2=standard(inv value), col 3=lastWeek, col 4=4wkAvg (only 5 cols)
