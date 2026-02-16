@@ -281,6 +281,65 @@
             letter-spacing: 0.5px;
         }
 
+        /* ─── Assets Section ─── */
+        .sort-toggle-btn {
+            margin-left: 16px;
+            padding: 3px 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #58a6ff;
+            background: rgba(88,166,255,0.1);
+            border: 1px solid rgba(88,166,255,0.25);
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.15s;
+            letter-spacing: 0.3px;
+        }
+        .sort-toggle-btn:hover {
+            background: rgba(88,166,255,0.2);
+            border-color: rgba(88,166,255,0.4);
+        }
+
+        .assets-total-row {
+            background: rgba(88,166,255,0.06) !important;
+            border-top: 2px solid #2d333b;
+            font-weight: 700;
+        }
+        .assets-total-row td { font-weight: 700; color: #fff !important; }
+
+        .pct-bar-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 140px;
+            justify-content: flex-end;
+        }
+        .pct-bar {
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #238636, #3fb950);
+            min-width: 0;
+            width: 0%;
+            transition: width 0.4s ease;
+            flex-shrink: 0;
+            max-width: 100px;
+        }
+        .pct-bar-total {
+            background: linear-gradient(90deg, #1f6feb, #58a6ff) !important;
+        }
+        .pct-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #8b949e;
+            min-width: 48px;
+            text-align: right;
+        }
+        .assets-total-row .pct-label { color: #58a6ff; }
+
+        .assets-table td:nth-child(3) {
+            font-variant-numeric: tabular-nums;
+        }
+
         /* Color accents per section */
         .icon-blue { background: rgba(88,166,255,0.15); color: #58a6ff; }
         .icon-green { background: rgba(63,185,80,0.15); color: #3fb950; }
@@ -557,6 +616,8 @@
             title: 'Assets',
             icon: '\u{1F3E6}',
             iconClass: 'icon-blue',
+            assetsSection: true,
+            customHeaders: ['Metric', 'Owner', 'Most Recent', '% of Total'],
             metrics: [
                 { name: 'Active Stock at Amazon', owner: 'Rey', standard: '' },
                 { name: 'Damaged/Defective Stock at Amazon (LESS THE PROVISION)', owner: 'Rey', standard: '' },
@@ -578,7 +639,7 @@
                 { name: 'Grade and Resell Amazon Program- Used Stock UNITS', owner: 'Rey', standard: '' },
                 { name: 'Grade and Resell Amazon Program- Used Stock VALUE', owner: 'Rey', standard: '' },
                 { name: 'Loan to Shareholder', owner: 'Mae', standard: '' },
-                { name: 'TOTAL', owner: '', standard: '' },
+                { name: 'TOTAL', owner: '', standard: '', isTotal: true },
             ]
         },
         {
@@ -613,25 +674,41 @@
             div.id = `section-${section.id}`;
             const headers = section.customHeaders || ['Metric', 'Owner', 'Standard', 'Last Week', '4 Wk Avg', '12 Mth Avg'];
             const colCount = headers.length;
+
+            // Assets section gets a sort button in the header
+            const sortBtn = section.assetsSection
+                ? `<button class="sort-toggle-btn" onclick="event.stopPropagation(); toggleAssetsSort()" id="assetsSortBtn" title="Sort by value">&#x25BC; Sort High to Low</button>`
+                : '';
+
             div.innerHTML = `
                 <div class="section-header" onclick="toggleSection('${section.id}')">
                     <div class="section-title">
                         <div class="section-icon ${section.iconClass}">${section.icon}</div>
                         ${section.title}
+                        ${sortBtn}
                     </div>
                     <svg class="chevron" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/>
                     </svg>
                 </div>
                 <div class="section-body">
-                    <table class="data-table">
+                    <table class="data-table${section.assetsSection ? ' assets-table' : ''}">
                         <thead>
                             <tr>
                                 ${headers.map(h => `<th>${h}</th>`).join('')}
                             </tr>
                         </thead>
                         <tbody id="tbody-${section.id}">
-                            ${section.metrics.map(m => {
+                            ${section.assetsSection ? section.metrics.map(m => {
+                                const totalClass = m.isTotal ? ' class="assets-total-row"' : '';
+                                return `
+                                <tr${totalClass} data-asset-name="${m.name}">
+                                    <td><div class="metric-name">${m.name}</div></td>
+                                    <td>${m.owner ? `<span class="owner-badge">${m.owner}</span>` : ''}</td>
+                                    <td style="text-align:right" class="val-neutral">-</td>
+                                    <td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>
+                                </tr>`;
+                            }).join('') : section.metrics.map(m => {
                                 const dataCols = colCount - 3;
                                 const rowClass = m.critical ? ' class="critical-row"' : '';
                                 const badge = m.critical ? '<span class="critical-badge">Critical</span>' : '';
@@ -649,6 +726,40 @@
             `;
             dashboard.appendChild(div);
         });
+    }
+
+    // ─── ASSETS SORT FUNCTIONALITY ─────────────────────────────────────
+    let assetsSortDirection = 'none'; // 'none', 'desc', 'asc'
+
+    function toggleAssetsSort() {
+        const btn = document.getElementById('assetsSortBtn');
+        if (assetsSortDirection === 'none' || assetsSortDirection === 'asc') {
+            assetsSortDirection = 'desc';
+            btn.innerHTML = '&#x25BC; Sort High to Low';
+        } else {
+            assetsSortDirection = 'asc';
+            btn.innerHTML = '&#x25B2; Sort Low to High';
+        }
+        sortAssetsTable();
+    }
+
+    function sortAssetsTable() {
+        const tbody = document.getElementById('tbody-assets');
+        if (!tbody) return;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const totalRow = rows.find(r => r.classList.contains('assets-total-row'));
+        const dataRows = rows.filter(r => !r.classList.contains('assets-total-row'));
+
+        dataRows.sort((a, b) => {
+            const aVal = parseFloat((a.querySelectorAll('td')[2].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
+            const bVal = parseFloat((b.querySelectorAll('td')[2].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
+            return assetsSortDirection === 'desc' ? bVal - aVal : aVal - bVal;
+        });
+
+        // Re-append: data rows first, then total at the bottom
+        tbody.innerHTML = '';
+        dataRows.forEach(r => tbody.appendChild(r));
+        if (totalRow) tbody.appendChild(totalRow);
     }
 
     function toggleSection(id) {
@@ -839,6 +950,11 @@
                         tds[4].textContent = formatValue(data.fourWkAvg);
                         tds[4].className = 'val-neutral';
                     }
+                } else if (section.assetsSection) {
+                    // Assets section: col 2=Most Recent (lastWeek), col 3=% of Total (calculated after loop)
+                    if (data) {
+                        tds[2].textContent = formatValue(data.lastWeek);
+                    }
                 } else {
                     // Standard 6-column layout
                     if (data) {
@@ -859,6 +975,47 @@
                     }
                 }
             });
+
+            // After populating all rows for assets, calculate % of Total
+            if (section.assetsSection) {
+                const allTrs = tbody.querySelectorAll('tr');
+                // Find the total row value
+                const totalRow = tbody.querySelector('.assets-total-row');
+                let totalVal = 0;
+                if (totalRow) {
+                    const totalText = totalRow.querySelectorAll('td')[2].textContent || '0';
+                    totalVal = parseFloat(totalText.replace(/[$,\s%]/g, '')) || 0;
+                }
+
+                allTrs.forEach(tr => {
+                    const rowTds = tr.querySelectorAll('td');
+                    const valText = rowTds[2].textContent || '0';
+                    const numVal = parseFloat(valText.replace(/[$,\s%]/g, '')) || 0;
+                    const pctCell = rowTds[3];
+                    const pctBar = pctCell.querySelector('.pct-bar');
+                    const pctLabel = pctCell.querySelector('.pct-label');
+
+                    if (tr.classList.contains('assets-total-row')) {
+                        // Total row shows 100%
+                        if (pctBar) pctBar.style.width = '100%';
+                        if (pctLabel) pctLabel.textContent = '100%';
+                        if (pctBar) pctBar.classList.add('pct-bar-total');
+                    } else if (totalVal > 0 && numVal !== 0) {
+                        const pct = Math.abs(numVal) / Math.abs(totalVal) * 100;
+                        const displayPct = pct.toFixed(1) + '%';
+                        if (pctBar) pctBar.style.width = Math.min(pct, 100) + '%';
+                        if (pctLabel) pctLabel.textContent = displayPct;
+                    } else {
+                        if (pctBar) pctBar.style.width = '0%';
+                        if (pctLabel) pctLabel.textContent = '-';
+                    }
+                });
+
+                // Apply sort if active
+                if (assetsSortDirection !== 'none') {
+                    sortAssetsTable();
+                }
+            }
         });
     }
 
