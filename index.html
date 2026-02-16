@@ -981,17 +981,27 @@
                 }
             });
 
-            // After populating all rows for assets, calculate % of Total
+            // After populating all rows for assets, calculate the real total and % of Total
             if (section.assetsSection) {
                 const allTrs = tbody.querySelectorAll('tr');
-                // Find the total row value
                 const totalRow = tbody.querySelector('.assets-total-row');
-                let totalVal = 0;
+
+                // Step 1: Sum all non-total row values to get the real total
+                let calculatedTotal = 0;
+                allTrs.forEach(tr => {
+                    if (tr.classList.contains('assets-total-row')) return;
+                    const valText = tr.querySelectorAll('td')[2].textContent || '0';
+                    const num = parseFloat(valText.replace(/[$,\s%]/g, '')) || 0;
+                    calculatedTotal += num;
+                });
+
+                // Step 2: Update the TOTAL row to show the calculated sum
                 if (totalRow) {
-                    const totalText = totalRow.querySelectorAll('td')[2].textContent || '0';
-                    totalVal = parseFloat(totalText.replace(/[$,\s%]/g, '')) || 0;
+                    const totalTds = totalRow.querySelectorAll('td');
+                    totalTds[2].textContent = '$' + calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
                 }
 
+                // Step 3: Calculate % of Total for each row
                 allTrs.forEach(tr => {
                     const rowTds = tr.querySelectorAll('td');
                     const valText = rowTds[2].textContent || '0';
@@ -1001,18 +1011,15 @@
                     const pctLabel = pctCell.querySelector('.pct-label');
 
                     if (tr.classList.contains('assets-total-row')) {
-                        // Total row shows 100%
-                        if (pctBar) pctBar.style.width = '100%';
+                        if (pctBar) { pctBar.style.width = '100%'; pctBar.classList.add('pct-bar-total'); }
                         if (pctLabel) pctLabel.textContent = '100%';
-                        if (pctBar) pctBar.classList.add('pct-bar-total');
-                    } else if (totalVal > 0 && numVal !== 0) {
-                        const pct = Math.abs(numVal) / Math.abs(totalVal) * 100;
-                        const displayPct = pct.toFixed(1) + '%';
+                    } else if (calculatedTotal > 0 && numVal !== 0) {
+                        const pct = Math.abs(numVal) / calculatedTotal * 100;
                         if (pctBar) pctBar.style.width = Math.min(pct, 100) + '%';
-                        if (pctLabel) pctLabel.textContent = displayPct;
+                        if (pctLabel) pctLabel.textContent = pct.toFixed(1) + '%';
                     } else {
                         if (pctBar) pctBar.style.width = '0%';
-                        if (pctLabel) pctLabel.textContent = '-';
+                        if (pctLabel) pctLabel.textContent = '0.0%';
                     }
                 });
 
