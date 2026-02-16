@@ -285,22 +285,20 @@
         }
 
         /* ─── Assets Section ─── */
-        .sort-toggle-btn {
-            margin-left: 16px;
-            padding: 3px 10px;
-            font-size: 11px;
-            font-weight: 600;
-            color: #58a6ff;
-            background: rgba(88,166,255,0.1);
-            border: 1px solid rgba(88,166,255,0.25);
-            border-radius: 6px;
-            cursor: pointer;
-            transition: all 0.15s;
+        .assets-table-label {
+            padding: 10px 12px 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #e1e4e8;
             letter-spacing: 0.3px;
         }
-        .sort-toggle-btn:hover {
-            background: rgba(88,166,255,0.2);
-            border-color: rgba(88,166,255,0.4);
+        .assets-sort-note {
+            font-weight: 400;
+            font-size: 11px;
+            color: #484f58;
+        }
+        .assets-pct-table {
+            margin-bottom: 8px;
         }
 
         .assets-total-row {
@@ -620,7 +618,7 @@
             icon: '\u{1F3E6}',
             iconClass: 'icon-blue',
             assetsSection: true,
-            customHeaders: ['Metric', 'Owner', 'Most Recent', '% of Total'],
+            customHeaders: ['Metric', 'Owner', 'Last Week', '4 Wk Avg', '12 Mth Avg'],
             metrics: [
                 { name: 'Active Stock at Amazon', owner: 'Rey', standard: '' },
                 { name: 'Damaged/Defective Stock at Amazon (LESS THE PROVISION)', owner: 'Rey', standard: '' },
@@ -678,53 +676,85 @@
             const headers = section.customHeaders || ['Metric', 'Owner', 'Standard', 'Last Week', '4 Wk Avg', '12 Mth Avg'];
             const colCount = headers.length;
 
-            // Assets section gets a sort button in the header
-            const sortBtn = section.assetsSection
-                ? `<button class="sort-toggle-btn" onclick="event.stopPropagation(); toggleAssetsSort()" id="assetsSortBtn" title="Sort by value">&#x25BC; Sort High to Low</button>`
-                : '';
-
             div.innerHTML = `
                 <div class="section-header" onclick="toggleSection('${section.id}')">
                     <div class="section-title">
                         <div class="section-icon ${section.iconClass}">${section.icon}</div>
                         ${section.title}
-                        ${sortBtn}
                     </div>
                     <svg class="chevron" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/>
                     </svg>
                 </div>
                 <div class="section-body">
-                    <table class="data-table${section.assetsSection ? ' assets-table' : ''}">
+                    ${section.assetsSection ? `
+                    <!-- TABLE 1: Dollar Values -->
+                    <div class="assets-table-label">Dollar Values <span class="assets-sort-note">(sorted by Last Week, highest first)</span></div>
+                    <table class="data-table assets-table">
                         <thead>
                             <tr>
-                                ${headers.map(h => `<th>${h}</th>`).join('')}
+                                ${headers.map(h => '<th>' + h + '</th>').join('')}
                             </tr>
                         </thead>
                         <tbody id="tbody-${section.id}">
-                            ${section.assetsSection ? section.metrics.map(m => {
+                            ${section.metrics.map(m => {
                                 const totalClass = m.isTotal ? ' class="assets-total-row"' : '';
-                                return `
-                                <tr${totalClass} data-asset-name="${m.name}">
-                                    <td><div class="metric-name">${m.name}</div></td>
-                                    <td>${m.owner ? `<span class="owner-badge">${m.owner}</span>` : ''}</td>
-                                    <td style="text-align:right" class="val-neutral">-</td>
-                                    <td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>
-                                </tr>`;
-                            }).join('') : section.metrics.map(m => {
-                                const dataCols = colCount - 3;
-                                const rowClass = m.critical ? ' class="critical-row"' : '';
-                                const badge = m.critical ? '<span class="critical-badge">Critical</span>' : '';
-                                return `
-                                <tr${rowClass}>
-                                    <td><div class="metric-name">${m.name}${badge}</div></td>
-                                    <td>${m.owner ? `<span class="owner-badge">${m.owner}</span>` : ''}</td>
-                                    <td style="text-align:right">${m.standard || '-'}</td>
-                                    ${Array(dataCols).fill('<td class="val-neutral">-</td>').join('')}
-                                </tr>`;
+                                return '<tr' + totalClass + ' data-asset-name="' + m.name + '">' +
+                                    '<td><div class="metric-name">' + m.name + '</div></td>' +
+                                    '<td>' + (m.owner ? '<span class="owner-badge">' + m.owner + '</span>' : '') + '</td>' +
+                                    '<td style="text-align:right" class="val-neutral">-</td>' +
+                                    '<td style="text-align:right" class="val-neutral">-</td>' +
+                                    '<td style="text-align:right" class="val-neutral">-</td>' +
+                                '</tr>';
                             }).join('')}
                         </tbody>
                     </table>
+
+                    <!-- TABLE 2: Percentage of Total -->
+                    <div class="assets-table-label" style="margin-top:24px;">% of Total Breakdown</div>
+                    <table class="data-table assets-table assets-pct-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                <th>Last Week %</th>
+                                <th>4 Wk Avg %</th>
+                                <th>12 Mth Avg %</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${section.id}-pct">
+                            ${section.metrics.map(m => {
+                                const totalClass = m.isTotal ? ' class="assets-total-row"' : '';
+                                return '<tr' + totalClass + ' data-asset-name="' + m.name + '">' +
+                                    '<td><div class="metric-name">' + m.name + '</div></td>' +
+                                    '<td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>' +
+                                    '<td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>' +
+                                    '<td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>' +
+                                '</tr>';
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    ` : `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                ${headers.map(h => '<th>' + h + '</th>').join('')}
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${section.id}">
+                            ${section.metrics.map(m => {
+                                const dataCols = colCount - 3;
+                                const rowClass = m.critical ? ' class="critical-row"' : '';
+                                const badge = m.critical ? '<span class="critical-badge">Critical</span>' : '';
+                                return '<tr' + rowClass + '>' +
+                                    '<td><div class="metric-name">' + m.name + badge + '</div></td>' +
+                                    '<td>' + (m.owner ? '<span class="owner-badge">' + m.owner + '</span>' : '') + '</td>' +
+                                    '<td style="text-align:right">' + (m.standard || '-') + '</td>' +
+                                    Array(dataCols).fill('<td class="val-neutral">-</td>').join('') +
+                                '</tr>';
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    `}
                 </div>
             `;
             dashboard.appendChild(div);
@@ -732,34 +762,19 @@
     }
 
     // ─── ASSETS SORT FUNCTIONALITY ─────────────────────────────────────
-    let assetsSortDirection = 'none'; // 'none', 'desc', 'asc'
 
-    function toggleAssetsSort() {
-        const btn = document.getElementById('assetsSortBtn');
-        if (assetsSortDirection === 'none' || assetsSortDirection === 'asc') {
-            assetsSortDirection = 'desc';
-            btn.innerHTML = '&#x25BC; Sort High to Low';
-        } else {
-            assetsSortDirection = 'asc';
-            btn.innerHTML = '&#x25B2; Sort Low to High';
-        }
-        sortAssetsTable();
-    }
-
-    function sortAssetsTable() {
-        const tbody = document.getElementById('tbody-assets');
+    function sortAssetsTbody(tbody, colIndex) {
         if (!tbody) return;
         const rows = Array.from(tbody.querySelectorAll('tr'));
         const totalRow = rows.find(r => r.classList.contains('assets-total-row'));
         const dataRows = rows.filter(r => !r.classList.contains('assets-total-row'));
 
         dataRows.sort((a, b) => {
-            const aVal = parseFloat((a.querySelectorAll('td')[2].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
-            const bVal = parseFloat((b.querySelectorAll('td')[2].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
-            return assetsSortDirection === 'desc' ? bVal - aVal : aVal - bVal;
+            const aVal = parseFloat((a.querySelectorAll('td')[colIndex].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
+            const bVal = parseFloat((b.querySelectorAll('td')[colIndex].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
+            return bVal - aVal; // Always highest first
         });
 
-        // Re-append: data rows first, then total at the bottom
         tbody.innerHTML = '';
         dataRows.forEach(r => tbody.appendChild(r));
         if (totalRow) tbody.appendChild(totalRow);
@@ -954,11 +969,11 @@
                         tds[4].className = 'val-neutral';
                     }
                 } else if (section.assetsSection) {
-                    // Assets section: col 2=Most Recent value, col 3=% of Total (calculated after loop)
-                    // Use the most recent non-empty value: Last Week → 4 Wk Avg → 12 Mth Avg → Standard
+                    // Assets dollar table: col 2=Last Week, col 3=4 Wk Avg, col 4=12 Mth Avg
                     if (data) {
-                        const mostRecent = getMostRecent(data.lastWeek, data.fourWkAvg, data.twelveMthAvg, data.standard);
-                        tds[2].textContent = formatValue(mostRecent);
+                        tds[2].textContent = formatValue(data.lastWeek);
+                        tds[3].textContent = formatValue(data.fourWkAvg);
+                        tds[4].textContent = formatValue(data.twelveMthAvg);
                     }
                 } else {
                     // Standard 6-column layout
@@ -981,51 +996,77 @@
                 }
             });
 
-            // After populating all rows for assets, calculate the real total and % of Total
+            // After populating dollar table, calculate totals, sort, and build percentage table
             if (section.assetsSection) {
-                const allTrs = tbody.querySelectorAll('tr');
-                const totalRow = tbody.querySelector('.assets-total-row');
+                const dollarTrs = tbody.querySelectorAll('tr');
+                const dollarTotalRow = tbody.querySelector('.assets-total-row');
 
-                // Step 1: Sum all non-total row values to get the real total
-                let calculatedTotal = 0;
-                allTrs.forEach(tr => {
+                // Calculate totals for each period by summing non-total rows
+                let totalLW = 0, totalFW = 0, totalTM = 0;
+                dollarTrs.forEach(tr => {
                     if (tr.classList.contains('assets-total-row')) return;
-                    const valText = tr.querySelectorAll('td')[2].textContent || '0';
-                    const num = parseFloat(valText.replace(/[$,\s%]/g, '')) || 0;
-                    calculatedTotal += num;
+                    const cells = tr.querySelectorAll('td');
+                    totalLW += parseFloat((cells[2].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
+                    totalFW += parseFloat((cells[3].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
+                    totalTM += parseFloat((cells[4].textContent || '0').replace(/[$,\s%]/g, '')) || 0;
                 });
 
-                // Step 2: Update the TOTAL row to show the calculated sum
-                if (totalRow) {
-                    const totalTds = totalRow.querySelectorAll('td');
-                    totalTds[2].textContent = '$' + calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                // Update TOTAL row in dollar table
+                if (dollarTotalRow) {
+                    const tc = dollarTotalRow.querySelectorAll('td');
+                    const fmt = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                    tc[2].textContent = fmt(totalLW);
+                    tc[3].textContent = fmt(totalFW);
+                    tc[4].textContent = fmt(totalTM);
                 }
 
-                // Step 3: Calculate % of Total for each row
-                allTrs.forEach(tr => {
-                    const rowTds = tr.querySelectorAll('td');
-                    const valText = rowTds[2].textContent || '0';
-                    const numVal = parseFloat(valText.replace(/[$,\s%]/g, '')) || 0;
-                    const pctCell = rowTds[3];
-                    const pctBar = pctCell.querySelector('.pct-bar');
-                    const pctLabel = pctCell.querySelector('.pct-label');
+                // Sort dollar table by Last Week (col 2) highest first
+                sortAssetsTbody(tbody, 2);
 
-                    if (tr.classList.contains('assets-total-row')) {
-                        if (pctBar) { pctBar.style.width = '100%'; pctBar.classList.add('pct-bar-total'); }
-                        if (pctLabel) pctLabel.textContent = '100%';
-                    } else if (calculatedTotal > 0 && numVal !== 0) {
-                        const pct = Math.abs(numVal) / calculatedTotal * 100;
-                        if (pctBar) pctBar.style.width = Math.min(pct, 100) + '%';
-                        if (pctLabel) pctLabel.textContent = pct.toFixed(1) + '%';
-                    } else {
-                        if (pctBar) pctBar.style.width = '0%';
-                        if (pctLabel) pctLabel.textContent = '0.0%';
-                    }
-                });
+                // Now populate the percentage table
+                const pctTbody = document.getElementById('tbody-assets-pct');
+                if (pctTbody) {
+                    const pctTrs = pctTbody.querySelectorAll('tr');
+                    const totals = [totalLW, totalFW, totalTM];
 
-                // Apply sort if active
-                if (assetsSortDirection !== 'none') {
-                    sortAssetsTable();
+                    // Map metric data to pct rows
+                    section.metrics.forEach((metric, i) => {
+                        if (!pctTrs[i]) return;
+                        const key = metric.name.toLowerCase();
+                        const data = leftLookup[key] || rightLookup[key];
+                        const pctCells = pctTrs[i].querySelectorAll('td');
+                        const isTotal = pctTrs[i].classList.contains('assets-total-row');
+
+                        const values = data ? [data.lastWeek, data.fourWkAvg, data.twelveMthAvg] : ['', '', ''];
+
+                        // For each of the 3 period columns (cells 1, 2, 3)
+                        for (let c = 0; c < 3; c++) {
+                            const bar = pctCells[c + 1].querySelector('.pct-bar');
+                            const label = pctCells[c + 1].querySelector('.pct-label');
+                            const total = totals[c];
+
+                            if (isTotal) {
+                                // TOTAL row: show dollar total and 100% bar
+                                const fmt = v => '$' + v.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                                if (label) label.textContent = fmt(total);
+                                if (bar) { bar.style.width = '100%'; bar.classList.add('pct-bar-total'); }
+                            } else {
+                                const raw = values[c] || '';
+                                const numVal = parseFloat(raw.replace(/[$,\s%]/g, '')) || 0;
+                                if (total > 0 && numVal !== 0) {
+                                    const pct = Math.abs(numVal) / Math.abs(total) * 100;
+                                    if (bar) bar.style.width = Math.min(pct, 100) + '%';
+                                    if (label) label.textContent = pct.toFixed(1) + '%';
+                                } else {
+                                    if (bar) bar.style.width = '0%';
+                                    if (label) label.textContent = '0.0%';
+                                }
+                            }
+                        }
+                    });
+
+                    // Sort pct table by Last Week % (col 1) highest first
+                    sortAssetsTbody(pctTbody, 1);
                 }
             }
         });
