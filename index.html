@@ -954,9 +954,11 @@
                         tds[4].className = 'val-neutral';
                     }
                 } else if (section.assetsSection) {
-                    // Assets section: col 2=Most Recent (lastWeek), col 3=% of Total (calculated after loop)
+                    // Assets section: col 2=Most Recent value, col 3=% of Total (calculated after loop)
+                    // Use the most recent non-empty value: Last Week → 4 Wk Avg → 12 Mth Avg → Standard
                     if (data) {
-                        tds[2].textContent = formatValue(data.lastWeek);
+                        const mostRecent = getMostRecent(data.lastWeek, data.fourWkAvg, data.twelveMthAvg, data.standard);
+                        tds[2].textContent = formatValue(mostRecent);
                     }
                 } else {
                     // Standard 6-column layout
@@ -1020,6 +1022,15 @@
                 }
             }
         });
+    }
+
+    // Return the most recent non-empty, non-error value from a priority list
+    function getMostRecent(...vals) {
+        const invalid = ['', '-', 'N/A', '#N/A', '#REF!', '#DIV/0!', '#VALUE!'];
+        for (const v of vals) {
+            if (v && !invalid.includes(v.toString().trim())) return v;
+        }
+        return '';
     }
 
     function formatValue(val) {
