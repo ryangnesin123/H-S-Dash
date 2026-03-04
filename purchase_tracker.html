@@ -1907,6 +1907,7 @@
             poNumber: '',
             supplier: '',
             brand: '',
+            channel: '',
             eta: '',
             eta3pl: '',
             newEta3pl: '',
@@ -2503,6 +2504,7 @@
         { key: 'poNumber', label: 'PO #', width: '200px' },
         { key: 'supplier', label: 'Supplier', width: '150px' },
         { key: 'brand', label: 'Brand', width: '100px' },
+        { key: 'channel', label: 'Channel', width: '110px' },
         { key: 'type', label: 'Type', width: '100px' },
         { key: 'qty', label: 'QTY', width: '70px' },
         { key: 'poValueUSD', label: 'PO Value', width: '110px' },
@@ -2933,6 +2935,7 @@
     const INLINE_SELECT_OPTIONS = {
         account: ['HeartSole', 'Gunyah Trading'],
         type: ['ATS', 'PREBOOK', 'UNGATING', 'OTHER'],
+        channel: ['Amazon', 'eBay', 'Walmart', 'Wholesale', 'Other'],
     };
 
     const MONEY_FIELDS = ['poValueUSD', 'importCost', 'importDuties', 'costTo3PL', 'threePLFee', 'costToFBA', 'estReturnCost'];
@@ -3147,6 +3150,7 @@
                     ${formField('Supplier', 'supplier', po.supplier, 'datalist', [...new Set(state.purchaseOrders.map(p => p.supplier).filter(Boolean))].sort())}
                     ${formField('Brand', 'brand', po.brand, 'datalist', [...new Set(state.purchaseOrders.map(p => p.brand).filter(Boolean))].sort())}
                     ${formField('ETA 3PL', 'eta3pl', po.eta3pl, 'date')}
+                    ${formField('Channel', 'channel', po.channel, 'select', ['Amazon', 'eBay', 'Walmart', 'Wholesale', 'Other'])}
                     ${formField('Type', 'type', po.type, 'select', ['ATS', 'PREBOOK', 'UNGATING', 'OTHER'])}
                     <div class="form-group full-width">
                         <label>Notes</label>
