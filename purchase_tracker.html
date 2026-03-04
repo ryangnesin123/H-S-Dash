@@ -2755,6 +2755,10 @@
                     html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${fmt$(po.poValueUSD)}</td>`;
                 } else if (col.key === 'qty') {
                     html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${fmtNum(po.qty)}</td>`;
+                } else if (col.key === 'channel') {
+                    const ch = po.channel || '';
+                    const chStyle = ch && ch !== 'Amazon' ? 'color:#f85149;font-weight:600' : '';
+                    html += `<td style="${chStyle}" onclick="startInlineEdit('${po.id}','${col.key}',this)">${ch || '<span class="check-no">—</span>'}</td>`;
                 } else if (col.key === 'notes') {
                     html += `<td class="notes-col" title="${esc(po.notes)}" onclick="startInlineEdit('${po.id}','${col.key}',this)">${po.notes || '<span class="check-no">—</span>'}</td>`;
                 } else {
