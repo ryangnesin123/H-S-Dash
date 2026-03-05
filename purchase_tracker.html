@@ -1182,7 +1182,7 @@
         }
 
         .chart-card-bar .chart-container {
-            height: 300px;
+            height: 550px;
         }
 
         .chart-card-wide {
@@ -5165,6 +5165,7 @@
                         grid: { color: '#21262d' },
                         ticks: {
                             color: '#8b949e',
+                            stepSize: 100000,
                             callback: function(val) { return fmt$(val); }
                         }
                     }
@@ -5186,7 +5187,14 @@
                         borderColor: '#30363d',
                         borderWidth: 1
                     },
-                    datalabels: { display: false }
+                    datalabels: {
+                        display: true,
+                        anchor: function(ctx) { return ctx.dataset.data[ctx.dataIndex] >= 0 ? 'end' : 'start'; },
+                        align: function(ctx) { return ctx.dataset.data[ctx.dataIndex] >= 0 ? 'top' : 'bottom'; },
+                        color: '#8b949e',
+                        font: { size: 9, weight: '600' },
+                        formatter: function(val) { return fmt$(val); }
+                    }
                 }
             },
             plugins: [ChartDataLabels]
