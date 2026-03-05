@@ -661,6 +661,19 @@
                 { name: 'video', owner: 'Rey', standard: '' },
             ]
         },
+        {
+            id: 'lead_times',
+            title: '3PL Lead Times',
+            icon: '\u{1F69A}',
+            iconClass: 'icon-orange',
+            leadTimesSection: true,
+            locations: ['upstate', 'cali prep', 'amz prep', 'bubble box'],
+            metrics: [
+                { name: 'Days Payment to 3PL (wtd avg)' },
+                { name: 'Days 3PL to Ship to FBA (wtd avg)' },
+                { name: 'Days Ship to FBA to Live for Sales (wtd avg)' },
+            ]
+        },
     ];
 
     // ─── RENDERING ─────────────────────────────────────────────────────
@@ -729,6 +742,44 @@
                                     '<td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>' +
                                     '<td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>' +
                                     '<td style="text-align:right"><div class="pct-bar-container"><div class="pct-bar"></div><span class="pct-label">-</span></div></td>' +
+                                '</tr>';
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    ` : section.leadTimesSection ? `
+                    <!-- Lead Times: Past 12 Months -->
+                    <div class="assets-table-label">Past 12 Months</div>
+                    <table class="data-table lead-times-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                ${section.locations.map(l => '<th>' + l + '</th>').join('')}
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${section.id}-12m">
+                            ${section.metrics.map(m => {
+                                return '<tr>' +
+                                    '<td><div class="metric-name">' + m.name + '</div></td>' +
+                                    section.locations.map(() => '<td style="text-align:right" class="val-neutral">-</td>').join('') +
+                                '</tr>';
+                            }).join('')}
+                        </tbody>
+                    </table>
+
+                    <!-- Lead Times: Past 3 Months -->
+                    <div class="assets-table-label" style="margin-top:24px;">Past 3 Months</div>
+                    <table class="data-table lead-times-table">
+                        <thead>
+                            <tr>
+                                <th>Metric</th>
+                                ${section.locations.map(l => '<th>' + l + '</th>').join('')}
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${section.id}-3m">
+                            ${section.metrics.map(m => {
+                                return '<tr>' +
+                                    '<td><div class="metric-name">' + m.name + '</div></td>' +
+                                    section.locations.map(() => '<td style="text-align:right" class="val-neutral">-</td>').join('') +
                                 '</tr>';
                             }).join('')}
                         </tbody>
@@ -926,8 +977,57 @@
             }
         }
 
+        // Parse lead times data (right side, unique column layout)
+        // Structure: "PAST 12 MONTHS" header row, then 3 metric rows with location values in cols 9-12
+        //            "PAST 3 MONTHS" header row, then 3 metric rows with location values in cols 9-12
+        const leadTimes12m = {};
+        const leadTimes3m = {};
+        let leadTimePeriod = '';
+        for (const row of rows) {
+            if (!row || row.length < 9) continue;
+            const col8 = (row[8] || '').trim();
+            if (col8 === 'PAST 12 MONTHS') { leadTimePeriod = '12m'; continue; }
+            if (col8 === 'PAST 3 MONTHS') { leadTimePeriod = '3m'; continue; }
+            if (leadTimePeriod && col8.toLowerCase().startsWith('days ')) {
+                const key = col8.toLowerCase();
+                const vals = [
+                    (row[9] || '').trim(),
+                    (row[10] || '').trim(),
+                    (row[11] || '').trim(),
+                    (row[12] || '').trim()
+                ];
+                if (leadTimePeriod === '12m') leadTimes12m[key] = vals;
+                else leadTimes3m[key] = vals;
+            }
+        }
+
         // Now update each section's metrics
         SECTIONS.forEach(section => {
+            // Lead times has its own two tbodies, handle separately
+            if (section.leadTimesSection) {
+                const tbody12m = document.getElementById('tbody-lead_times-12m');
+                const tbody3m = document.getElementById('tbody-lead_times-3m');
+                [
+                    { tbody: tbody12m, lookup: leadTimes12m },
+                    { tbody: tbody3m, lookup: leadTimes3m }
+                ].forEach(({ tbody: tb, lookup }) => {
+                    if (!tb) return;
+                    const trs = tb.querySelectorAll('tr');
+                    section.metrics.forEach((metric, i) => {
+                        if (!trs[i]) return;
+                        const key = metric.name.toLowerCase();
+                        const vals = lookup[key];
+                        const tds = trs[i].querySelectorAll('td');
+                        if (vals) {
+                            for (let c = 0; c < 4; c++) {
+                                tds[c + 1].textContent = formatValue(vals[c]);
+                            }
+                        }
+                    });
+                });
+                return;
+            }
+
             const tbody = document.getElementById(`tbody-${section.id}`);
             if (!tbody) return;
 
