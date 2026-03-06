@@ -4429,33 +4429,7 @@
 
     function toggleCFSection(sectionId) {
         cfCollapsedSections[sectionId] = !cfCollapsedSections[sectionId];
-        const rows = document.querySelectorAll(`.cf-section-${sectionId}`);
-        const arrow = document.getElementById(`cf-arrow-${sectionId}`);
-        if (cfCollapsedSections[sectionId]) {
-            rows.forEach(r => r.style.display = 'none');
-            if (arrow) arrow.textContent = '▶';
-            // Collapsing paid section also hides past weeks
-            if (sectionId === 'paid' && cfShowPast) {
-                togglePastWeeks();
-            }
-        } else {
-            rows.forEach(r => {
-                // Keep detail rows hidden — they only open on specific row click
-                if (r.classList.contains('cf-detail-row')) {
-                    r.style.display = 'none';
-                } else {
-                    r.style.display = '';
-                    // Also reset any expanded state
-                    r.classList.remove('cf-row-expanded');
-                }
-            });
-            if (arrow) arrow.textContent = '▼';
-            // Re-apply search filter if active
-            const searchInput = document.getElementById('cfSearchInput');
-            if (searchInput && searchInput.value.trim()) {
-                filterCashflowRows(searchInput.value);
-            }
-        }
+        renderCashflow();
     }
 
     function editCFCell(td, key, currentVal, isDecimal = false) {
