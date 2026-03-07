@@ -1114,6 +1114,62 @@
         .cf-table td.cf-manual-input.zero {
             color: rgba(240, 184, 64, 0.45) !important;
         }
+        .cf-table td .inv-note-icon {
+            position: absolute;
+            top: 1px;
+            right: 2px;
+            font-size: 8px;
+            color: #484f58;
+            cursor: pointer;
+            line-height: 1;
+            z-index: 2;
+        }
+        .cf-table td .inv-note-icon:hover { color: #58a6ff; }
+        .cf-table td .inv-note-icon.has-note { color: #58a6ff; }
+        .cf-table td.inv-note-cell { position: relative; }
+        .inv-note-popup {
+            position: fixed;
+            background: #1c2333;
+            border: 1px solid #58a6ff;
+            border-radius: 6px;
+            padding: 8px 10px;
+            z-index: 10001;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+            width: 220px;
+        }
+        .inv-note-popup textarea {
+            width: 100%;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            color: #e1e4e8;
+            border-radius: 4px;
+            padding: 6px 8px;
+            font-size: 11px;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            box-sizing: border-box;
+            min-height: 50px;
+        }
+        .inv-note-popup textarea:focus { border-color: #58a6ff; }
+        .inv-note-popup .inv-note-btns {
+            display: flex;
+            gap: 6px;
+            margin-top: 6px;
+            justify-content: flex-end;
+        }
+        .inv-note-popup .inv-note-btns button {
+            padding: 3px 10px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            background: #21262d;
+            color: #c9d1d9;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .inv-note-popup .inv-note-btns button:hover { background: #30363d; }
+        .inv-note-popup .inv-note-btns button.save-btn { background: #238636; border-color: #238636; color: #fff; }
+        .inv-note-popup .inv-note-btns button.save-btn:hover { background: #2ea043; }
 
         .cf-table td.editable input {
             background: transparent;
@@ -3772,9 +3828,9 @@
         }
 
         // First pass: inventory/COGS
-        // New Inventory Arriving: manual for first 4 weeks, then formula (outgoing cash from 3 weeks ago)
+        // New Inventory Arriving: manual for first 8 weeks, then formula (outgoing cash from 3 weeks ago)
         const currentWeekIdx2 = weeks.findIndex(d => isCurrentWeek(d));
-        const manualInvCutoff2 = currentWeekIdx2 >= 0 ? currentWeekIdx2 + 4 : 4;
+        const manualInvCutoff2 = currentWeekIdx2 >= 0 ? currentWeekIdx2 + 8 : 8;
 
         for (let i = 0; i < weeks.length; i++) {
             const wk = weekData[i].wk;
@@ -4114,7 +4170,7 @@
             'Operating Cashflow': 'Receivables − Outgoing Cash.\nPositive = more coming in than going out.',
             'Total Available Capital': 'Sum of all capital sources\n(Cash in Bank + Parker Card + all others).',
             'Inventory Start of Week': 'Week 1: Manual input (gold).\nOther weeks: Previous week\'s End of Week Stock.',
-            'New Inventory Arriving': 'Weeks 1–4: Manual input (gold).\nWeek 5+: Outgoing Cash from 3 weeks ago\n(inventory ordered 3 weeks prior arriving).',
+            'New Inventory Arriving': 'Weeks 1–8: Manual input (gold). Click + to add source note.\nWeek 9+: Outgoing Cash from 3 weeks ago\n(inventory ordered 3 weeks prior arriving).',
             'Sales for the Week': '(Inventory Start + New Inventory) × Sales Multiple.',
             'Sales Multiple': 'Manual input (gold). What % of inventory\nis expected to sell each week.',
             'End of Week Stock': 'Inventory Start + New Inventory − COGS.',
@@ -4467,6 +4523,62 @@
         });
     }
 
+    function editInvNote(event, weekKey) {
+        event.stopPropagation();
+        // Remove existing popup
+        const existing = document.getElementById('invNotePopup');
+        if (existing) existing.remove();
+
+        const noteKey = `inv_note_${weekKey}`;
+        const currentNote = (state.cashflowOverrides || {})[noteKey] || '';
+
+        const popup = document.createElement('div');
+        popup.id = 'invNotePopup';
+        popup.className = 'inv-note-popup';
+        popup.innerHTML = `<div style="color:#58a6ff;font-size:10px;font-weight:600;margin-bottom:4px;text-transform:uppercase;">Source Note</div>
+            <textarea id="invNoteText">${currentNote}</textarea>
+            <div class="inv-note-btns">
+                <button onclick="document.getElementById('invNotePopup').remove()">Cancel</button>
+                <button class="save-btn" onclick="saveInvNote('${weekKey}')">Save</button>
+            </div>`;
+        document.body.appendChild(popup);
+
+        // Position near the click
+        const rect = event.target.getBoundingClientRect();
+        let left = rect.right + 5;
+        let top = rect.top - 5;
+        if (left + 230 > window.innerWidth) left = rect.left - 230;
+        if (top + 120 > window.innerHeight) top = window.innerHeight - 130;
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+
+        popup.querySelector('textarea').focus();
+
+        // Close on outside click
+        setTimeout(() => {
+            document.addEventListener('click', function closeNote(e) {
+                if (!popup.contains(e.target) && e.target !== event.target) {
+                    popup.remove();
+                    document.removeEventListener('click', closeNote);
+                }
+            });
+        }, 100);
+    }
+
+    function saveInvNote(weekKey) {
+        const noteKey = `inv_note_${weekKey}`;
+        const text = (document.getElementById('invNoteText')?.value || '').trim();
+        if (!state.cashflowOverrides) state.cashflowOverrides = {};
+        if (text) {
+            state.cashflowOverrides[noteKey] = text;
+        } else {
+            delete state.cashflowOverrides[noteKey];
+        }
+        saveState();
+        document.getElementById('invNotePopup')?.remove();
+        renderCashflow();
+    }
+
     function updateCashflowParam(key, value) {
         state.cashflowSettings[key] = value;
         saveState();
@@ -4741,7 +4853,7 @@
 
         // Inventory first pass
         const currentWeekIdx = weeks.findIndex(d => isCurrentWeek(d));
-        const manualInvCutoff = currentWeekIdx >= 0 ? currentWeekIdx + 4 : 4;
+        const manualInvCutoff = currentWeekIdx >= 0 ? currentWeekIdx + 8 : 8;
         const invData = [];
         for (let i = 0; i < weeks.length; i++) {
             const wk = weekTotals[i].wk;
@@ -6743,9 +6855,9 @@
         }
 
         // First pass: calculate inventory/COGS for all weeks
-        // New Inventory Arriving: manual for first 4 weeks from current, then formula (outgoing cash from 3 weeks ago)
+        // New Inventory Arriving: manual for first 8 weeks from current, then formula (outgoing cash from 3 weeks ago)
         const currentWeekIdx = weeks.findIndex(d => isCurrentWeek(d));
-        const manualInvCutoff = currentWeekIdx >= 0 ? currentWeekIdx + 4 : 4; // first 4 weeks from current are manual
+        const manualInvCutoff = currentWeekIdx >= 0 ? currentWeekIdx + 8 : 8; // first 8 weeks from current are manual
 
         for (let i = 0; i < weeks.length; i++) {
             const wk = weekTotals[i].wk;
@@ -7166,9 +7278,15 @@
         weeks.forEach((d, i) => {
             const wk = getWeekKey(d);
             const isManual = invData[i].isManualInv;
-            // Manual weeks get amber color; formula weeks stay default
             const cls = [pastCls(d), isManual ? 'cf-manual-input' : ''].filter(Boolean).join(' ');
-            html += amountCell(invData[i].newArriving, true, isCurrentWeek(d), `inv_arriving_${wk}`, cls);
+            const n = Number(invData[i].newArriving) || 0;
+            const valCls = n > 0 ? 'positive' : n < 0 ? 'negative' : 'zero';
+            const weekCls = isCurrentWeek(d) ? 'week-current' : '';
+            const noteKey = `inv_note_${wk}`;
+            const note = (overrides[noteKey] || '').replace(/"/g, '&quot;');
+            const hasNote = !!overrides[noteKey];
+            const noteIcon = `<span class="inv-note-icon${hasNote ? ' has-note' : ''}" onclick="editInvNote(event,'${wk}')" title="${hasNote ? note : 'Add note'}">${hasNote ? '📝' : '+'}</span>`;
+            html += `<td class="amount ${valCls} editable ${weekCls} ${cls} inv-note-cell" onclick="editCFCell(this, 'inv_arriving_${wk}', ${n})">${noteIcon}${fmt$(n)}</td>`;
         });
         html += `</tr>`;
 
