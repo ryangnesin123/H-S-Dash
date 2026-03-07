@@ -3841,9 +3841,11 @@
             const overrideKey = `inv_arriving_${wk}`;
             const smKey = `sales_multiple_${wk}`;
 
-            const invStart = (i === 0)
-                ? (overrides[`inv_start_${wk}`] !== undefined ? overrides[`inv_start_${wk}`] : cs.inventoryStartOfWeek)
-                : invData[i - 1].endStock;
+            // inv_start override allowed for week 0 and current week only; all others cascade
+            const canOvrStart = (i === 0 || i === currentWeekIdx2);
+            const invStart = (canOvrStart && overrides[`inv_start_${wk}`] !== undefined)
+                ? overrides[`inv_start_${wk}`]
+                : (i === 0 ? cs.inventoryStartOfWeek : invData[i - 1].endStock);
 
             let newArriving = 0;
             const isManualInvWeek = i < manualInvCutoff2;
@@ -4863,9 +4865,10 @@
         const invData = [];
         for (let i = 0; i < weeks.length; i++) {
             const wk = weekTotals[i].wk;
-            const invStart = (i === 0)
-                ? (overrides[`inv_start_${wk}`] !== undefined ? overrides[`inv_start_${wk}`] : (cs.inventoryStartOfWeek || 0))
-                : (invData[i - 1] ? invData[i - 1].endStock : 0);
+            const canOvrStart = (i === 0 || i === currentWeekIdx);
+            const invStart = (canOvrStart && overrides[`inv_start_${wk}`] !== undefined)
+                ? overrides[`inv_start_${wk}`]
+                : (i === 0 ? (cs.inventoryStartOfWeek || 0) : (invData[i - 1] ? invData[i - 1].endStock : 0));
             let newArriving = 0;
             if (i < manualInvCutoff && overrides[`inv_arriving_${wk}`] !== undefined) newArriving = overrides[`inv_arriving_${wk}`];
             else if (i >= manualInvCutoff && i >= 3) newArriving = weekTotals[i - 3].unpaidTotal;
@@ -6871,9 +6874,11 @@
             const smKey = `sales_multiple_${wk}`;
             const newArrKey = `inv_arriving_${wk}`;
 
-            const invStart = (i === 0)
-                ? (overrides[`inv_start_${wk}`] !== undefined ? overrides[`inv_start_${wk}`] : cs.inventoryStartOfWeek)
-                : invData[i - 1].endStock;
+            // inv_start override allowed for week 0 and current week only; all others cascade
+            const canOvrStart = (i === 0 || i === currentWeekIdx);
+            const invStart = (canOvrStart && overrides[`inv_start_${wk}`] !== undefined)
+                ? overrides[`inv_start_${wk}`]
+                : (i === 0 ? cs.inventoryStartOfWeek : invData[i - 1].endStock);
 
             // New Inventory Arriving logic:
             // 1) Manual weeks (current + next 7): user override wins
