@@ -3845,7 +3845,8 @@
             const invStart = invStartOvr !== undefined ? invStartOvr : (i === 0 ? cs.inventoryStartOfWeek : invData[i - 1].endStock);
 
             let newArriving = 0;
-            if (overrides[overrideKey] !== undefined) {
+            const isManualInvWeek = i < manualInvCutoff2;
+            if (isManualInvWeek && overrides[overrideKey] !== undefined) {
                 newArriving = overrides[overrideKey];
             } else if (i >= manualInvCutoff2 && i >= 3) {
                 newArriving = weekData[i - 3].unpaidTotal;
@@ -4864,7 +4865,7 @@
             const invStart = overrides[`inv_start_${wk}`] !== undefined ? overrides[`inv_start_${wk}`] :
                 (i === 0 ? (cs.inventoryStartOfWeek || 0) : (invData[i - 1] ? invData[i - 1].endStock : 0));
             let newArriving = 0;
-            if (overrides[`inv_arriving_${wk}`] !== undefined) newArriving = overrides[`inv_arriving_${wk}`];
+            if (i < manualInvCutoff && overrides[`inv_arriving_${wk}`] !== undefined) newArriving = overrides[`inv_arriving_${wk}`];
             else if (i >= manualInvCutoff && i >= 3) newArriving = weekTotals[i - 3].unpaidTotal;
             const salesMultiple = overrides[`sales_multiple_${wk}`] !== undefined ? overrides[`sales_multiple_${wk}`] : (cs.salesMultiple || 0);
             const salesForWeek = (invStart + newArriving) * salesMultiple;
@@ -6873,14 +6874,13 @@
                 (i === 0 ? cs.inventoryStartOfWeek : invData[i - 1].endStock);
 
             // New Inventory Arriving logic:
-            // 1) User override always wins
-            // 2) Past weeks and first 4 weeks from current: manual (default 0)
-            // 3) Week 5+ from current: outgoing cash (unpaid POs) from 3 weeks ago
+            // 1) Manual weeks (current + next 7): user override wins
+            // 2) Formula weeks (9+): always use unpaid total from 3 weeks ago (ignore stale overrides)
             let newArriving = 0;
-            if (overrides[newArrKey] !== undefined) {
+            const isManualInvWeek = i >= currentWeekIdx && i < manualInvCutoff;
+            if (isManualInvWeek && overrides[newArrKey] !== undefined) {
                 newArriving = overrides[newArrKey];
             } else if (i >= manualInvCutoff && i >= 3) {
-                // Formula: outgoing cash from 3 weeks ago
                 newArriving = weekTotals[i - 3].unpaidTotal;
             }
 
