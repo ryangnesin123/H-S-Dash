@@ -1007,6 +1007,7 @@
 
         .cf-table .cf-past-col {
             background: rgba(139, 148, 158, 0.05);
+            opacity: 0.45;
         }
 
         .cf-table thead .cf-past-col {
@@ -3852,7 +3853,7 @@
             const cogs = salesForWeek * cs.cogsPercent;
             const endStock = invStart + newArriving - cogs;
 
-            invData.push({ invStart, newArriving, salesForWeek, salesMultiple, cogs, endStock, isManualInv: i < manualInvCutoff2 });
+            invData.push({ invStart, newArriving, salesForWeek, salesMultiple, cogs, endStock, isManualInv: i >= currentWeekIdx2 && i < manualInvCutoff2 });
         }
 
         // Second pass: receivables and cash data
@@ -6885,7 +6886,7 @@
             const cogs = salesForWeek * cs.cogsPercent;
             const endStock = invStart + newArriving - cogs;
 
-            invData.push({ invStart, newArriving, salesForWeek, salesMultiple, cogs, endStock, isManualInv: i < manualInvCutoff });
+            invData.push({ invStart, newArriving, salesForWeek, salesMultiple, cogs, endStock, isManualInv: i >= currentWeekIdx && i < manualInvCutoff });
         }
 
         // Second pass: calculate receivables and cash data (needs COGS from first pass)
@@ -7282,11 +7283,15 @@
             const n = Number(invData[i].newArriving) || 0;
             const valCls = n > 0 ? 'positive' : n < 0 ? 'negative' : 'zero';
             const weekCls = isCurrentWeek(d) ? 'week-current' : '';
-            const noteKey = `inv_note_${wk}`;
-            const note = (overrides[noteKey] || '').replace(/"/g, '&quot;');
-            const hasNote = !!overrides[noteKey];
-            const noteIcon = `<span class="inv-note-icon${hasNote ? ' has-note' : ''}" onclick="editInvNote(event,'${wk}')" title="${hasNote ? note : 'Add note'}">${hasNote ? '📝' : '+'}</span>`;
-            html += `<td class="amount ${valCls} editable ${weekCls} ${cls} inv-note-cell" onclick="editCFCell(this, 'inv_arriving_${wk}', ${n})">${noteIcon}${fmt$(n)}</td>`;
+            // Only show note icon on the 8 manual weeks (current + next 7)
+            let noteIcon = '';
+            if (isManual) {
+                const noteKey = `inv_note_${wk}`;
+                const note = (overrides[noteKey] || '').replace(/"/g, '&quot;');
+                const hasNote = !!overrides[noteKey];
+                noteIcon = `<span class="inv-note-icon${hasNote ? ' has-note' : ''}" onclick="editInvNote(event,'${wk}')" title="${hasNote ? note : 'Add source note'}">${hasNote ? '📝' : '+'}</span>`;
+            }
+            html += `<td class="amount ${valCls} editable ${weekCls} ${cls}${isManual ? ' inv-note-cell' : ''}" onclick="editCFCell(this, 'inv_arriving_${wk}', ${n})">${noteIcon}${fmt$(n)}</td>`;
         });
         html += `</tr>`;
 
