@@ -3890,7 +3890,8 @@
             const rcList = cs.recurringCosts || [];
             const recurringAmts = rcList.map(rc => -getRecurringCostForWeek(rc, weeks[i]));
             const recurringTotal = recurringAmts.reduce((s, v) => s + v, 0);
-            const availCashStart = i === 0 ? prevEndingCash : cashData[i - 1].endingCash;
+            const totalCapBasic = (cs.capitalSources || []).reduce((s, c) => s + (Number(c.amount) || 0), 0);
+            const availCashStart = (i === 0 || i === currentWeekIdx2) ? totalCapBasic : cashData[i - 1].endingCash;
             const endingCash = availCashStart + opCashflow + weeklyExp + monthlyPmts + recurringTotal;
 
             cashData.push({ outgoingCash, receivables, opCashflow, weeklyExp, monthlyPmts, recurringAmts, recurringTotal, availCashStart, endingCash });
@@ -4916,7 +4917,7 @@
                 -((cs.monthlyInvestor || 0) + (cs.monthlySBA || 0) + (cs.monthlyCommbankRyan || 0) + (cs.monthlyCommbankTessa || 0)) : 0;
             const rcList = cs.recurringCosts || [];
             const recurringTotal = rcList.reduce((s, rc) => s - getRecurringCostForWeek(rc, weeks[i]), 0);
-            const availCashStart = (i === 0) ? totalCapital : prevEndingCash;
+            const availCashStart = (i === 0 || i === currentWeekIdx) ? totalCapital : prevEndingCash;
             const endingCash = availCashStart + opCashflow + weeklyExp + monthlyPmts + recurringTotal;
 
             prevEndingCash = endingCash;
@@ -6932,7 +6933,7 @@
             const recurringAmts = rcList.map(rc => -getRecurringCostForWeek(rc, weeks[i]));
             const recurringTotal = recurringAmts.reduce((s, v) => s + v, 0);
             const totalCapital = (cs.capitalSources || []).reduce((s, c) => s + (Number(c.amount) || 0), 0);
-            const availCashStart = (i === 0) ? totalCapital : cashData[i - 1].endingCash;
+            const availCashStart = (i === 0 || i === currentWeekIdx) ? totalCapital : cashData[i - 1].endingCash;
             const endingCash = availCashStart + opCashflow + weeklyExp + monthlyPmts + recurringTotal;
 
             cashData.push({ outgoingCash, receivables, opCashflow, weeklyExp, monthlyPmts, recurringAmts, recurringTotal, availCashStart, endingCash });
