@@ -1007,7 +1007,8 @@
 
         .cf-table .cf-past-col {
             background: rgba(139, 148, 158, 0.05);
-            opacity: 0.45;
+            opacity: 0.35;
+            color: #6e7681 !important;
         }
 
         .cf-table thead .cf-past-col {
@@ -1111,22 +1112,24 @@
         /* Manual input cells — distinct amber/gold color to indicate user-entered values */
         .cf-table td.cf-manual-input {
             color: #f0b840 !important;
+            background: rgba(240, 184, 64, 0.08) !important;
         }
         .cf-table td.cf-manual-input.zero {
             color: rgba(240, 184, 64, 0.45) !important;
         }
         .cf-table td .inv-note-icon {
             position: absolute;
-            top: 1px;
-            right: 2px;
-            font-size: 8px;
-            color: #484f58;
+            top: 2px;
+            right: 3px;
+            font-size: 11px;
+            font-weight: 700;
+            color: #6e7681;
             cursor: pointer;
             line-height: 1;
             z-index: 2;
         }
         .cf-table td .inv-note-icon:hover { color: #58a6ff; }
-        .cf-table td .inv-note-icon.has-note { color: #58a6ff; }
+        .cf-table td .inv-note-icon.has-note { color: #58a6ff; font-size: 12px; }
         .cf-table td.inv-note-cell { position: relative; }
         .inv-note-popup {
             position: fixed;
