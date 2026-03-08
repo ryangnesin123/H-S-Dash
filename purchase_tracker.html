@@ -6313,12 +6313,8 @@
         menu.className = 'cf-status-menu';
 
         if (section === 'paid') {
-            // PAID section: Mark as Pending + Move to Unpaid + Cancel
+            // PAID section: Move to Unpaid + Cancel
             menu.innerHTML = `
-                <div class="menu-item" onclick="cfMarkAsPending('${escapedPO}')">
-                    <span class="dot" style="background:#d29922"></span>
-                    Mark as Pending
-                </div>
                 <div class="menu-item" onclick="cfMoveToUnpaid('${escapedPO}'${payArg})">
                     <span class="dot" style="background:#d29922"></span>
                     Move to Unpaid
