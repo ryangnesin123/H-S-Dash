@@ -674,6 +674,21 @@
                 { name: 'Days Ship to FBA to Live for Sales (wtd avg)' },
             ]
         },
+        {
+            id: 'supplier_credits',
+            title: 'Credits Owing To Us',
+            icon: '\u{1F4B3}',
+            iconClass: 'icon-green',
+            supplierCreditsSection: true,
+            customHeaders: ['Supplier', 'Units', '$ Value', 'PO#'],
+            metrics: [
+                { name: 'Supplier1' },
+                { name: 'Supplier2' },
+                { name: 'Supplier3' },
+                { name: 'Supplier4' },
+                { name: 'TOTAL', isTotal: true },
+            ]
+        },
     ];
 
     // ─── RENDERING ─────────────────────────────────────────────────────
@@ -780,6 +795,25 @@
                                 return '<tr>' +
                                     '<td><div class="metric-name">' + m.name + '</div></td>' +
                                     section.locations.map(() => '<td style="text-align:right" class="val-neutral">-</td>').join('') +
+                                '</tr>';
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    ` : section.supplierCreditsSection ? `
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                ${headers.map(h => '<th>' + h + '</th>').join('')}
+                            </tr>
+                        </thead>
+                        <tbody id="tbody-${section.id}">
+                            ${section.metrics.map(m => {
+                                const totalClass = m.isTotal ? ' class="assets-total-row"' : '';
+                                return '<tr' + totalClass + '>' +
+                                    '<td><div class="metric-name">' + m.name + '</div></td>' +
+                                    '<td style="text-align:right" class="val-neutral">-</td>' +
+                                    '<td style="text-align:right" class="val-neutral">-</td>' +
+                                    '<td style="text-align:right" class="val-neutral">-</td>' +
                                 '</tr>';
                             }).join('')}
                         </tbody>
@@ -1001,8 +1035,45 @@
             }
         }
 
+        // Parse supplier credits data (right side, col 8=name, 9=units, 10=$ value, 11=PO#)
+        const supplierCredits = {};
+        let inCreditsSection = false;
+        for (const row of rows) {
+            if (!row || row.length < 9) continue;
+            const col8 = (row[8] || '').trim();
+            if (col8 === 'Credits Owing To Us') { inCreditsSection = true; continue; }
+            if (inCreditsSection && col8) {
+                const key = col8.toLowerCase();
+                supplierCredits[key] = {
+                    units: (row[9] || '').trim(),
+                    value: (row[10] || '').trim(),
+                    po: (row[11] || '').trim()
+                };
+                if (key === 'total') inCreditsSection = false;
+            }
+        }
+
         // Now update each section's metrics
         SECTIONS.forEach(section => {
+            // Supplier credits section
+            if (section.supplierCreditsSection) {
+                const tbody = document.getElementById('tbody-supplier_credits');
+                if (!tbody) return;
+                const trs = tbody.querySelectorAll('tr');
+                section.metrics.forEach((metric, i) => {
+                    if (!trs[i]) return;
+                    const key = metric.name.toLowerCase();
+                    const data = supplierCredits[key];
+                    const tds = trs[i].querySelectorAll('td');
+                    if (data) {
+                        tds[1].textContent = formatValue(data.units);
+                        tds[2].textContent = formatValue(data.value);
+                        tds[3].textContent = formatValue(data.po);
+                    }
+                });
+                return;
+            }
+
             // Lead times has its own two tbodies, handle separately
             if (section.leadTimesSection) {
                 const tbody12m = document.getElementById('tbody-lead_times-12m');
