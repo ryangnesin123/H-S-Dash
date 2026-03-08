@@ -1473,12 +1473,12 @@
                 <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
                     <h3 style="margin:0;">PO Value Placed</h3>
                     <div class="po-range-btns" id="poRangeBtns">
-                        <button class="po-range-btn" onclick="setPOPlacedRange(4)">4w</button>
+                        <button class="po-range-btn active" onclick="setPOPlacedRange(4)">4w</button>
                         <button class="po-range-btn" onclick="setPOPlacedRange(8)">8w</button>
                         <button class="po-range-btn" onclick="setPOPlacedRange(12)">12w</button>
                         <button class="po-range-btn" onclick="setPOPlacedRange(24)">24w</button>
                         <button class="po-range-btn" onclick="setPOPlacedRange(36)">36w</button>
-                        <button class="po-range-btn active" onclick="setPOPlacedRange(48)">48w</button>
+                        <button class="po-range-btn" onclick="setPOPlacedRange(48)">48w</button>
                         <button class="po-range-btn" onclick="setPOPlacedRange(60)">60w</button>
                     </div>
                 </div>
@@ -2543,6 +2543,26 @@
         }
     }
 
+    function changePaymentStatus(poId, newStatus, event) {
+        if (event) event.stopPropagation();
+        const po = state.purchaseOrders.find(p => p.id === poId);
+        if (!po) return;
+        const oldPayStatus = computePaymentStatus(po);
+        if (newStatus === oldPayStatus) return;
+        if (po.payments && Array.isArray(po.payments) && po.payments.length > 0) {
+            if (newStatus === 'Fully Paid') {
+                po.payments.forEach(p => { p.status = 'paid'; if (!p.paidDate) p.paidDate = new Date().toISOString().split('T')[0]; });
+            } else if (newStatus === 'Not Paid') {
+                po.payments.forEach(p => { p.status = 'unpaid'; delete p.paidDate; });
+            }
+        }
+        recordPOChange(po, 'paymentStatus', [{ f: 'paymentStatus', o: oldPayStatus, n: newStatus }]);
+        saveState();
+        renderPOTable();
+        renderCashflow();
+        showToast(`Payment status → ${newStatus}`);
+    }
+
     function showToast(msg, type = 'success') {
         const t = document.createElement('div');
         t.className = `toast ${type}`;
@@ -2822,7 +2842,9 @@
                 if (col.key === 'paymentStatus') {
                     const payStatus = computePaymentStatus(po);
                     const cls = getPaymentStatusClass(payStatus);
-                    html += `<td><span class="payment-status-badge ${cls}">${payStatus}</span></td>`;
+                    const payOpts = ['Not Paid', 'Fully Paid'].map(s => `<option value="${s}" ${s === payStatus ? 'selected' : ''}>${s}</option>`);
+                    if (payStatus === 'Partially Paid') payOpts.splice(1, 0, `<option value="Partially Paid" selected>Partially Paid</option>`);
+                    html += `<td><select class="status-select ${cls}" onchange="changePaymentStatus('${po.id}', this.value, event)">${payOpts.join('')}</select></td>`;
                 } else if (col.key === 'logisticsStatus') {
                     const logStatus = po.logisticsStatus || 'Pending';
                     const cls = getLogisticsStatusClass(logStatus);
@@ -5321,7 +5343,7 @@
         });
     }
 
-    let poPlacedWeeks = 48; // Default to ~12 months
+    let poPlacedWeeks = 4; // Default to 4 weeks
 
     function setPOPlacedRange(numWeeks) {
         poPlacedWeeks = numWeeks;
@@ -5349,9 +5371,10 @@
             weeks.push(mon);
         }
 
-        // For each week, sum PO value for POs with entryDate falling in that week
+        // For each week, sum PO value and confirmed value for POs with entryDate falling in that week
         const weekLabels = [];
         const weekValues = [];
+        const weekConfirmedValues = [];
 
         weeks.forEach(monday => {
             const sunday = new Date(monday);
@@ -5362,16 +5385,23 @@
             const sunStr = sunday.toISOString().split('T')[0];
 
             let total = 0;
+            let confirmed = 0;
             state.purchaseOrders.forEach(po => {
                 if (!po.entryDate) return;
                 if ((po.logisticsStatus || 'Pending') === 'Cancelled') return;
                 if (po.entryDate >= monStr && po.entryDate <= sunStr) {
-                    total += Number(po.poValueUSD) || Number(po.valueConfirmed) || 0;
+                    const poVal = Number(po.poValueUSD) || 0;
+                    total += poVal;
+                    // Confirmed = POs with logistics status beyond Pending
+                    if ((po.logisticsStatus || 'Pending') !== 'Pending') {
+                        confirmed += Number(po.valueConfirmed) > 0 ? Number(po.valueConfirmed) : poVal;
+                    }
                 }
             });
 
             weekLabels.push(fmtWeekDate(monday));
             weekValues.push(total);
+            weekConfirmedValues.push(confirmed);
         });
 
         // Compute running total for display
@@ -5386,11 +5416,20 @@
             data: {
                 labels: weekLabels,
                 datasets: [{
-                    label: 'PO Value Placed',
+                    label: 'PO Value',
                     data: weekValues,
                     backgroundColor: weekValues.map(v => v > 0 ? '#58a6ff' : 'rgba(88,166,255,0.15)'),
                     borderRadius: numWeeks > 24 ? 2 : 4,
-                    barPercentage: numWeeks > 24 ? 0.9 : 0.7
+                    barPercentage: numWeeks > 24 ? 0.9 : 0.7,
+                    order: 1
+                }, {
+                    label: 'Confirmed',
+                    data: weekConfirmedValues,
+                    backgroundColor: weekConfirmedValues.map(v => v > 0 ? 'rgba(63, 185, 80, 0.85)' : 'transparent'),
+                    borderRadius: numWeeks > 24 ? 2 : 4,
+                    barPercentage: numWeeks > 24 ? 0.9 : 0.7,
+                    order: 0,
+                    datalabels: { display: false }
                 }]
             },
             options: {
@@ -5398,6 +5437,7 @@
                 maintainAspectRatio: false,
                 scales: {
                     x: {
+                        grouped: false,
                         grid: { color: '#21262d' },
                         ticks: {
                             color: '#8b949e',
@@ -5417,11 +5457,16 @@
                     }
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: { display: true, labels: { color: '#8b949e', boxWidth: 12, padding: 10, font: { size: 10 } } },
                     tooltip: {
                         callbacks: {
                             title: function(ctx) { return 'Week of ' + weekLabels[ctx[0].dataIndex]; },
-                            label: function(ctx) { return ` PO Value: ${fmt$(ctx.parsed.y)}`; }
+                            label: function(ctx) {
+                                const i = ctx.dataIndex;
+                                if (ctx.datasetIndex === 0) return ` PO Value: ${fmt$(weekValues[i])}`;
+                                if (ctx.datasetIndex === 1 && weekConfirmedValues[i] > 0) return ` Confirmed: ${fmt$(weekConfirmedValues[i])}`;
+                                return null;
+                            }
                         },
                         backgroundColor: '#1c2128',
                         titleColor: '#e1e4e8',
@@ -6250,8 +6295,12 @@
         menu.className = 'cf-status-menu';
 
         if (section === 'paid') {
-            // PAID section: Move to Unpaid + Cancel
+            // PAID section: Mark as Pending + Move to Unpaid + Cancel
             menu.innerHTML = `
+                <div class="menu-item" onclick="cfMarkAsPending('${escapedPO}')">
+                    <span class="dot" style="background:#d29922"></span>
+                    Mark as Pending
+                </div>
                 <div class="menu-item" onclick="cfMoveToUnpaid('${escapedPO}'${payArg})">
                     <span class="dot" style="background:#d29922"></span>
                     Move to Unpaid
@@ -6262,8 +6311,12 @@
                     Delete / Cancel PO
                 </div>`;
         } else {
-            // UNPAID section: Mark as Confirmed + Mark as Paid + Cancel
+            // UNPAID section: Mark as Pending + Mark as Confirmed + Mark as Paid + Cancel
             menu.innerHTML = `
+                <div class="menu-item" onclick="cfMarkAsPending('${escapedPO}')">
+                    <span class="dot" style="background:#d29922"></span>
+                    Mark as Pending
+                </div>
                 <div class="menu-item" onclick="cfMarkAsConfirmed('${escapedPO}')">
                     <span class="dot" style="background:#3fb950"></span>
                     Mark as Confirmed
@@ -6334,6 +6387,21 @@
         renderCashflow();
         const payLabel = paymentIdx !== undefined ? ` (payment ${Number(paymentIdx) + 1})` : '';
         showToast(`${poNumber}${payLabel}: marked as Paid`, 'success');
+    }
+
+    // Mark PO logistics as Pending from cashflow
+    function cfMarkAsPending(poNumber) {
+        const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
+        if (!po) return;
+        const oldLogistics = po.logisticsStatus || 'Pending';
+        po.logisticsStatus = 'Pending';
+        recordPOChange(po, 'logisticsStatus', [{ f: 'logisticsStatus', o: oldLogistics, n: 'Pending' }]);
+        saveState();
+        const menu = document.getElementById('cfStatusMenu');
+        if (menu) menu.remove();
+        renderCashflow();
+        renderPOTable();
+        showToast(`${poNumber}: marked as Pending`, 'success');
     }
 
     // Mark PO logistics as Confirmed from cashflow
