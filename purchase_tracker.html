@@ -1631,8 +1631,8 @@
             <span style="color:#8b949e;font-size:13px;">%</span>
             <span style="color:#8b949e;font-size:12px;margin-left:16px;">Past:</span>
             <div class="po-range-btns" style="margin-left:6px;" id="pastWeekBtns">
-                <button class="po-range-btn" onclick="setPastWeeks(0)">Hide</button>
-                <button class="po-range-btn active" onclick="setPastWeeks(8)">8w</button>
+                <button class="po-range-btn active" onclick="setPastWeeks(0)">Hide</button>
+                <button class="po-range-btn" onclick="setPastWeeks(8)">8w</button>
                 <button class="po-range-btn" onclick="setPastWeeks(16)">16w</button>
                 <button class="po-range-btn" onclick="setPastWeeks(24)">24w</button>
                 <button class="po-range-btn" onclick="setPastWeeks(36)">36w</button>
@@ -4372,8 +4372,8 @@
         }, 100);
     }
 
-    let cfShowPast = true;
-    let PAST_WEEKS = 8;
+    let cfShowPast = false;
+    let PAST_WEEKS = 0;
 
     function setPastWeeks(numWeeks) {
         PAST_WEEKS = numWeeks;
