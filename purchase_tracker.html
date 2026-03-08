@@ -6243,9 +6243,10 @@
             return `<span class="payment-status-badge pay-status-fully-paid" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${po.logisticsStatus || 'Pending'} — Click to change" style="cursor:pointer">PAID</span>`;
         }
 
-        const abbrevMap = { 'Not Paid': 'DUE', 'Partially Paid': 'PART', 'Fully Paid': 'PAID' };
-        const abbrev = abbrevMap[payStatus] || 'DUE';
-        return `<span class="payment-status-badge ${cls}" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${po.logisticsStatus || 'Pending'} — Click to change" style="cursor:pointer">${abbrev}</span>`;
+        const logStatus = po.logisticsStatus || 'Pending';
+        const logAbbrev = logStatus === 'Pending' ? 'PEND' : 'CONF';
+        const logCls = logStatus === 'Pending' ? 'pay-status-not-paid' : 'log-status-confirmed';
+        return `<span class="payment-status-badge ${logCls}" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${logStatus} — Click to change" style="cursor:pointer">${logAbbrev}</span>`;
     }
 
     // Find PO number from a legacy cashflow entry (for badge matching)
