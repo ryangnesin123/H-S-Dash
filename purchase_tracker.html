@@ -7456,7 +7456,13 @@
                     } catch {}
                 });
 
-                html += `<tr id="${rowId}" class="cf-section-unpaid ${colorCls} cf-row-clickable"${unpaidHidden}><td class="row-label" onclick="cfToggleDetail('${rowId}')" title="${cfEntryTooltip(entry)}">${badge}<span${linkClick}>${label}</span></td>`;
+                // Legacy row note support
+                const legPo = poNum ? state.purchaseOrders.find(p => p.poNumber === poNum) : null;
+                const legPoIdx = legPo ? state.purchaseOrders.indexOf(legPo) : -1;
+                const legNote = legPo?.cashflowNote || '';
+                const legNoteInd = legNote ? `<span class="cf-note-indicator" onclick="event.stopPropagation(); cfEditNote(event, ${legPoIdx}, null)" title="${legNote.replace(/"/g, '&quot;')}"></span>` : '';
+                const legCtx = legPoIdx >= 0 ? ` oncontextmenu="cfShowNoteContextMenu(event, ${legPoIdx}, null)"` : '';
+                html += `<tr id="${rowId}" class="cf-section-unpaid ${colorCls} cf-row-clickable"${unpaidHidden}><td class="row-label" onclick="cfToggleDetail('${rowId}')"${legCtx} title="${cfEntryTooltip(entry)}">${badge}<span${linkClick}>${label}</span>${legNoteInd}</td>`;
                 weeks.forEach(d => {
                     const wk = getWeekKey(d);
                     let amt = getEntryAmount(entry, wk);
@@ -7482,7 +7488,14 @@
                 // Auto-push: if split week is past-due, show in current week
                 const effectiveSplitWeek = splitWeekKey < currentWeekKey ? currentWeekKey : splitWeekKey;
 
-                html += `<tr id="${rowId}" class="cf-section-unpaid ${colorCls} cf-row-clickable"${unpaidHidden}><td class="row-label" style="border-left:3px solid ${linkColor};padding-left:6px" onclick="cfToggleDetail('${rowId}')" title="${cfEntryTooltip(entry)}">${badge}${label} (${splitIdx + 1}/${splitTotal})${subLabel}</td>`;
+                // Legacy-split row note support
+                const lsPo = poNum ? state.purchaseOrders.find(p => p.poNumber === poNum) : null;
+                const lsPoIdx = lsPo ? state.purchaseOrders.indexOf(lsPo) : -1;
+                const lsPayIdx = lsPo?.payments?.[splitIdx] ? splitIdx : null;
+                const lsNote = lsPayIdx !== null ? (lsPo?.payments?.[lsPayIdx]?.cashflowNote || '') : (lsPo?.cashflowNote || '');
+                const lsNoteInd = lsNote ? `<span class="cf-note-indicator" onclick="event.stopPropagation(); cfEditNote(event, ${lsPoIdx}, ${lsPayIdx !== null ? lsPayIdx : 'null'})" title="${lsNote.replace(/"/g, '&quot;')}"></span>` : '';
+                const lsCtx = lsPoIdx >= 0 ? ` oncontextmenu="cfShowNoteContextMenu(event, ${lsPoIdx}, ${lsPayIdx !== null ? lsPayIdx : 'null'})"` : '';
+                html += `<tr id="${rowId}" class="cf-section-unpaid ${colorCls} cf-row-clickable"${unpaidHidden}><td class="row-label" style="border-left:3px solid ${linkColor};padding-left:6px" onclick="cfToggleDetail('${rowId}')"${lsCtx} title="${cfEntryTooltip(entry)}">${badge}${label} (${splitIdx + 1}/${splitTotal})${subLabel}${lsNoteInd}</td>`;
                 weeks.forEach(d => {
                     const wk = getWeekKey(d);
                     const amt = wk === effectiveSplitWeek ? splitAmount : 0;
