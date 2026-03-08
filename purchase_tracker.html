@@ -431,9 +431,10 @@
         /* Logistics status dropdown colors */
         .log-status-pending { background: rgba(210, 153, 34, 0.15); color: #d29922; }
         .log-status-confirmed { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+        .log-status-shipped-to-3pl { background: rgba(168, 133, 223, 0.15); color: #a885df; }
         .log-status-at-3pl { background: rgba(188, 143, 243, 0.15); color: #bc8ff3; }
-        .log-status-shipped { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
-        .log-status-received { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+        .log-status-shipped-to-fba { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+        .log-status-received-fba { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
         .log-status-cancelled { background: rgba(248, 81, 73, 0.15); color: #f85149; }
 
         /* Inline status dropdown in PO table */
@@ -2217,7 +2218,7 @@
             expandedPO: null,
             editingPO: null,
             poSort: { col: '_rowIndex', dir: 'desc' },
-            columnFilters: { logisticsStatus: new Set(['Pending', 'Confirmed', 'At 3PL', 'Shipped to FBA']) },
+            columnFilters: { logisticsStatus: new Set(['Pending', 'Confirmed', 'Shipped to 3PL', 'At 3PL', 'Shipped to FBA']) },
             openFilterCol: null,
         };
     }
@@ -2479,7 +2480,7 @@
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
-    const LOGISTICS_STATUS_OPTIONS = ['Pending', 'Confirmed', 'At 3PL', 'Shipped to FBA', 'Received', 'Cancelled'];
+    const LOGISTICS_STATUS_OPTIONS = ['Pending', 'Confirmed', 'Shipped to 3PL', 'At 3PL', 'Shipped to FBA', 'Received FBA', 'Cancelled'];
 
     function computePaymentStatus(po) {
         if (!po.payments || po.payments.length === 0) return 'Not Paid';
@@ -2498,9 +2499,10 @@
     function getLogisticsStatusClass(logStatus) {
         const s = (logStatus || '').toLowerCase();
         if (s === 'confirmed') return 'log-status-confirmed';
+        if (s === 'shipped to 3pl') return 'log-status-shipped-to-3pl';
         if (s === 'at 3pl') return 'log-status-at-3pl';
-        if (s === 'shipped to fba') return 'log-status-shipped';
-        if (s === 'received') return 'log-status-received';
+        if (s === 'shipped to fba') return 'log-status-shipped-to-fba';
+        if (s === 'received fba') return 'log-status-received-fba';
         if (s === 'cancelled') return 'log-status-cancelled';
         return 'log-status-pending';
     }
@@ -2514,6 +2516,7 @@
         if (s === 'paid not shipped' || (s.includes('paid') && s.includes('not') && s.includes('ship'))) return 'Confirmed';
         if (s === 'shipped - not paid' || (s.includes('ship') && s.includes('not') && s.includes('paid'))) return 'Shipped to FBA';
         if (s === 'paid and shipped' || (s.includes('paid') && s.includes('ship') && !s.includes('not'))) return 'Shipped to FBA';
+        if (s === 'received' || s === 'received fba') return 'Received FBA';
         if (s === 'cancelled' || s.includes('cancel')) return 'Cancelled';
         if (s.includes('sold') || s.includes('final') || s.includes('semi') || s.includes('wfs')) return 'Shipped to FBA';
         if (s.includes('lost') || s.includes('locat')) return 'Cancelled';
@@ -6259,8 +6262,12 @@
                     Delete / Cancel PO
                 </div>`;
         } else {
-            // UNPAID section: Mark as Paid + Cancel
+            // UNPAID section: Mark as Confirmed + Mark as Paid + Cancel
             menu.innerHTML = `
+                <div class="menu-item" onclick="cfMarkAsConfirmed('${escapedPO}')">
+                    <span class="dot" style="background:#38bdf8"></span>
+                    Mark as Confirmed
+                </div>
                 <div class="menu-item" onclick="cfMarkAsPaid('${escapedPO}'${payArg})">
                     <span class="dot" style="background:#3fb950"></span>
                     Mark as Paid
@@ -6327,6 +6334,21 @@
         renderCashflow();
         const payLabel = paymentIdx !== undefined ? ` (payment ${Number(paymentIdx) + 1})` : '';
         showToast(`${poNumber}${payLabel}: marked as Paid`, 'success');
+    }
+
+    // Mark PO logistics as Confirmed from cashflow
+    function cfMarkAsConfirmed(poNumber) {
+        const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
+        if (!po) return;
+        const oldLogistics = po.logisticsStatus || 'Pending';
+        po.logisticsStatus = 'Confirmed';
+        recordPOChange(po, 'logisticsStatus', [{ f: 'logisticsStatus', o: oldLogistics, n: 'Confirmed' }]);
+        saveState();
+        const menu = document.getElementById('cfStatusMenu');
+        if (menu) menu.remove();
+        renderCashflow();
+        renderPOTable();
+        showToast(`${poNumber}: marked as Confirmed`, 'success');
     }
 
     // Move PO from paid back to unpaid
@@ -6712,8 +6734,8 @@
                         weekKey: wk,
                         hasDate: true,
                         isPaid,
-                        isConfirmed: status !== 'Pending',
-                        status,
+                        isConfirmed: (po.logisticsStatus || 'Pending') !== 'Pending',
+                        logisticsStatus: po.logisticsStatus || 'Pending',
                         poIdx,
                         paymentIdx: payIdx,
                         paymentId: payment.id,
@@ -6726,8 +6748,8 @@
                 });
             } else {
                 // Legacy single-payment: one entry per PO
-                const isPaid = status === 'Paid Not Shipped' || status === 'Paid and Shipped';
-                const isConfirmed = status !== 'Pending';
+                const isPaid = computePaymentStatus(po) === 'Fully Paid';
+                const isConfirmed = (po.logisticsStatus || 'Pending') !== 'Pending';
                 const amount = (isConfirmed && Number(po.valueConfirmed) > 0) ? Number(po.valueConfirmed) : Number(po.poValueUSD) || 0;
                 const hasDate = !!po.paymentDueDate;
                 const wk = hasDate ? getWeekKey(getMonday(parseLocalDate(po.paymentDueDate))) : null;
@@ -6739,7 +6761,7 @@
                     hasDate,
                     isPaid,
                     isConfirmed,
-                    status,
+                    logisticsStatus: po.logisticsStatus || 'Pending',
                     poIdx,
                     paymentIdx: null,
                     isMultiPayment: false,
@@ -7503,7 +7525,7 @@
             }
         });
         if (!state.ui.columnFilters || !state.ui.columnFilters.logisticsStatus) {
-            state.ui.columnFilters = { logisticsStatus: new Set(['Pending', 'Confirmed', 'At 3PL', 'Shipped to FBA']) };
+            state.ui.columnFilters = { logisticsStatus: new Set(['Pending', 'Confirmed', 'Shipped to 3PL', 'At 3PL', 'Shipped to FBA']) };
         }
 
         // Step 6: Render
