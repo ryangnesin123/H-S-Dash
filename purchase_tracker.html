@@ -414,12 +414,27 @@
             letter-spacing: 0.3px;
         }
 
-        .status-pending { background: rgba(210, 153, 34, 0.15); color: #d29922; }
-        .status-confirmed { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
-        .status-paid-not-shipped { background: rgba(188, 143, 243, 0.15); color: #bc8ff3; }
-        .status-shipped-not-paid { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
-        .status-paid-and-shipped { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
-        .status-cancelled { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+        /* Payment status badges (auto-computed, read-only) */
+        .pay-status-not-paid { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+        .pay-status-partially-paid { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+        .pay-status-fully-paid { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+        .payment-status-badge {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+        }
+        /* Logistics status dropdown colors */
+        .log-status-pending { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+        .log-status-confirmed { background: rgba(56, 189, 248, 0.15); color: #38bdf8; }
+        .log-status-at-3pl { background: rgba(188, 143, 243, 0.15); color: #bc8ff3; }
+        .log-status-shipped { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+        .log-status-received { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+        .log-status-cancelled { background: rgba(248, 81, 73, 0.15); color: #f85149; }
 
         /* Inline status dropdown in PO table */
         .status-select {
@@ -789,11 +804,7 @@
             filter: brightness(1.3);
             border-color: rgba(255,255,255,0.3);
         }
-        .cf-status-badge.s-pending { background: #d29922; color: #000; }
-        .cf-status-badge.s-confirmed { background: #3fb950; color: #000; }
-        .cf-status-badge.s-paid-not-shipped { background: #58a6ff; color: #000; }
-        .cf-status-badge.s-shipped-not-paid { background: #d2a8ff; color: #000; }
-        .cf-status-badge.s-paid-and-shipped { background: #238636; color: #fff; }
+        /* Payment status badges reuse .payment-status-badge + .pay-status-* classes */
 
         /* Status dropdown menu */
         .cf-status-menu {
@@ -1958,7 +1969,7 @@
         return {
             id: generateId(),
             entryDate: new Date().toISOString().split('T')[0],
-            status: 'Pending',
+            logisticsStatus: 'Pending',
             paidFull: false,
             sentToAmazon: false,
             snapReprice: false,
@@ -2206,7 +2217,7 @@
             expandedPO: null,
             editingPO: null,
             poSort: { col: '_rowIndex', dir: 'desc' },
-            columnFilters: { status: new Set(['Pending', 'Paid Not Shipped']) },
+            columnFilters: { logisticsStatus: new Set(['Pending', 'Confirmed', 'At 3PL', 'Shipped to FBA']) },
             openFilterCol: null,
         };
     }
@@ -2215,9 +2226,18 @@
         (state.purchaseOrders || []).forEach((po, i) => {
             if (po._rowIndex == null) po._rowIndex = i;
             formatPOText(po);
-            po.status = normalizeStatus(po.status);
-            if (po.status === 'Pending' && po.entryDate && po.entryDate < '2025-11-01') {
-                po.status = 'Paid and Shipped';
+            // Migrate old combined status → logisticsStatus
+            if (!po.logisticsStatus && po.status) {
+                po.logisticsStatus = normalizeLogisticsStatus(po.status);
+                // Also ensure old pre-2025-11 POs get shipped status
+                if (po.logisticsStatus === 'Pending' && po.entryDate && po.entryDate < '2025-11-01') {
+                    po.logisticsStatus = 'Shipped to FBA';
+                    // Mark all payments as paid for legacy POs
+                    if (po.payments) po.payments.forEach(p => { if (p.status !== 'paid') p.status = 'paid'; });
+                }
+                delete po.status;
+            } else if (!po.logisticsStatus) {
+                po.logisticsStatus = 'Pending';
             }
         });
     }
@@ -2459,61 +2479,55 @@
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     }
 
-    const STATUS_OPTIONS = [
-        'Pending',
-        'Confirmed',
-        'Paid Not Shipped',
-        'Shipped - Not Paid',
-        'Paid and Shipped',
-        'Cancelled'
-    ];
+    const LOGISTICS_STATUS_OPTIONS = ['Pending', 'Confirmed', 'At 3PL', 'Shipped to FBA', 'Received', 'Cancelled'];
 
-    function getStatusClass(status) {
-        if (!status) return 'status-pending';
-        const s = status.toLowerCase();
-        if (s === 'paid and shipped') return 'status-paid-and-shipped';
-        if (s === 'paid not shipped') return 'status-paid-not-shipped';
-        if (s === 'shipped - not paid') return 'status-shipped-not-paid';
-        if (s === 'confirmed' || s === 'confirmed - not paid') return 'status-confirmed';
-        if (s === 'pending') return 'status-pending';
-        if (s === 'cancelled') return 'status-cancelled';
-        // Legacy status mapping for imported data
-        if (s.includes('paid') && s.includes('ship') && !s.includes('not')) return 'status-paid-and-shipped';
-        if (s.includes('paid') && s.includes('not') && s.includes('ship')) return 'status-paid-not-shipped';
-        if (s.includes('ship') && s.includes('not') && s.includes('paid')) return 'status-shipped-not-paid';
-        if (s.includes('confirm')) return 'status-confirmed';
-        if (s.includes('pending')) return 'status-pending';
-        if (s.includes('cancel')) return 'status-cancelled';
-        if (s.includes('sold') || s.includes('final') || s.includes('semi')) return 'status-paid-and-shipped';
-        if (s.includes('wfs')) return 'status-paid-and-shipped';
-        if (s.includes('lost') || s.includes('locat')) return 'status-cancelled';
-        return 'status-pending';
+    function computePaymentStatus(po) {
+        if (!po.payments || po.payments.length === 0) return 'Not Paid';
+        const paidCount = po.payments.filter(p => p.status === 'paid').length;
+        if (paidCount === 0) return 'Not Paid';
+        if (paidCount === po.payments.length) return 'Fully Paid';
+        return 'Partially Paid';
     }
 
-    function normalizeStatus(status) {
-        if (!status) return 'Pending';
-        const s = status.toLowerCase();
+    function getPaymentStatusClass(payStatus) {
+        if (payStatus === 'Fully Paid') return 'pay-status-fully-paid';
+        if (payStatus === 'Partially Paid') return 'pay-status-partially-paid';
+        return 'pay-status-not-paid';
+    }
+
+    function getLogisticsStatusClass(logStatus) {
+        const s = (logStatus || '').toLowerCase();
+        if (s === 'confirmed') return 'log-status-confirmed';
+        if (s === 'at 3pl') return 'log-status-at-3pl';
+        if (s === 'shipped to fba') return 'log-status-shipped';
+        if (s === 'received') return 'log-status-received';
+        if (s === 'cancelled') return 'log-status-cancelled';
+        return 'log-status-pending';
+    }
+
+    // Migrate old combined status to logisticsStatus
+    function normalizeLogisticsStatus(oldStatus) {
+        if (!oldStatus) return 'Pending';
+        const s = oldStatus.toLowerCase();
         if (s === 'pending') return 'Pending';
         if (s === 'confirmed' || s === 'confirmed - not paid' || s.includes('confirm')) return 'Confirmed';
-        if (s === 'paid not shipped' || (s.includes('paid') && s.includes('not') && s.includes('ship'))) return 'Paid Not Shipped';
-        if (s === 'shipped - not paid' || (s.includes('ship') && s.includes('not') && s.includes('paid'))) return 'Shipped - Not Paid';
-        if (s === 'paid and shipped' || (s.includes('paid') && s.includes('ship') && !s.includes('not'))) return 'Paid and Shipped';
+        if (s === 'paid not shipped' || (s.includes('paid') && s.includes('not') && s.includes('ship'))) return 'Confirmed';
+        if (s === 'shipped - not paid' || (s.includes('ship') && s.includes('not') && s.includes('paid'))) return 'Shipped to FBA';
+        if (s === 'paid and shipped' || (s.includes('paid') && s.includes('ship') && !s.includes('not'))) return 'Shipped to FBA';
         if (s === 'cancelled' || s.includes('cancel')) return 'Cancelled';
-        // Legacy
-        if (s.includes('sold') || s.includes('final') || s.includes('semi') || s.includes('wfs')) return 'Paid and Shipped';
+        if (s.includes('sold') || s.includes('final') || s.includes('semi') || s.includes('wfs')) return 'Shipped to FBA';
         if (s.includes('lost') || s.includes('locat')) return 'Cancelled';
         return 'Pending';
     }
 
-    function changeStatus(poId, newStatus, event) {
+    function changeLogisticsStatus(poId, newStatus, event) {
         if (event) event.stopPropagation();
         const po = state.purchaseOrders.find(p => p.id === poId);
         if (po) {
-            const oldStatus = po.status;
-            pushUndo({ type: 'field', poId, field: 'status', oldValue: oldStatus });
-            po.status = newStatus;
-            recordPOChange(po, 'status', [{ f: 'status', o: oldStatus, n: newStatus }]);
-            // Sync confirmed value → payment amount when status changes
+            const oldStatus = po.logisticsStatus;
+            pushUndo({ type: 'field', poId, field: 'logisticsStatus', oldValue: oldStatus });
+            po.logisticsStatus = newStatus;
+            recordPOChange(po, 'logisticsStatus', [{ f: 'logisticsStatus', o: oldStatus, n: newStatus }]);
             if (po.payments && Array.isArray(po.payments) && po.payments.length === 1) {
                 const effectiveAmt = (Number(po.valueConfirmed) > 0) ? Number(po.valueConfirmed) : Number(po.poValueUSD) || 0;
                 if (effectiveAmt > 0 && po.payments[0].amount !== effectiveAmt) {
@@ -2522,7 +2536,7 @@
             }
             saveState();
             renderPOTable();
-            showToast('Status updated');
+            showToast('Logistics status updated');
         }
     }
 
@@ -2558,7 +2572,8 @@
     // PURCHASE TRACKER - TABLE RENDERING
     // ============================================================
     const PO_COLUMNS = [
-        { key: 'status', label: 'Status', width: '180px' },
+        { key: 'paymentStatus', label: 'Payment', width: '110px' },
+        { key: 'logisticsStatus', label: 'Logistics', width: '140px' },
         { key: 'entryDate', label: 'Date Added', width: '100px' },
         { key: 'account', label: 'Account', width: '110px' },
         { key: 'poNumber', label: 'PO #', width: '200px' },
@@ -2577,13 +2592,14 @@
     // ---- Column filter helpers ----
     function getDisplayValue(po, colKey) {
         const val = po[colKey];
-        if (colKey === 'status') return normalizeStatus(val);
+        if (colKey === 'paymentStatus') return computePaymentStatus(po);
+        if (colKey === 'logisticsStatus') return po.logisticsStatus || 'Pending';
         if (colKey === 'paidFull' || colKey === 'sentToAmazon') {
             return (val === true || val === 'Yes' || val === 'yes') ? 'Yes' : 'No';
         }
         if (colKey === 'entryDate' || colKey === 'paymentDueDate' || colKey === 'eta3pl' || colKey === 'newEta3pl') return fmtDate(val);
-        if (colKey === 'poValueUSD') return fmt$(val);
-        if (colKey === 'qty') return fmtNum(val);
+        if (colKey === 'poValueUSD' || colKey === 'valueConfirmed') return val ? fmt$(val) : '(empty)';
+        if (colKey === 'qty' || colKey === 'qtyConfirmed') return val ? fmtNum(val) : '(empty)';
         const s = String(val || '').trim();
         return s || '(empty)';
     }
@@ -2800,21 +2816,27 @@
             html += `<tr class="${isExpanded ? 'expanded' : ''}">`;
             PO_COLUMNS.forEach(col => {
                 const esc = (s) => String(s || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                if (col.key === 'status') {
-                    const norm = normalizeStatus(po.status);
-                    const cls = getStatusClass(norm);
-                    const opts = STATUS_OPTIONS.map(s => `<option value="${s}" ${s === norm ? 'selected' : ''}>${s}</option>`).join('');
-                    html += `<td><select class="status-select ${cls}" onchange="changeStatus('${po.id}', this.value, event)">${opts}</select></td>`;
+                if (col.key === 'paymentStatus') {
+                    const payStatus = computePaymentStatus(po);
+                    const cls = getPaymentStatusClass(payStatus);
+                    html += `<td><span class="payment-status-badge ${cls}">${payStatus}</span></td>`;
+                } else if (col.key === 'logisticsStatus') {
+                    const logStatus = po.logisticsStatus || 'Pending';
+                    const cls = getLogisticsStatusClass(logStatus);
+                    const opts = LOGISTICS_STATUS_OPTIONS.map(s => `<option value="${s}" ${s === logStatus ? 'selected' : ''}>${s}</option>`).join('');
+                    html += `<td><select class="status-select ${cls}" onchange="changeLogisticsStatus('${po.id}', this.value, event)">${opts}</select></td>`;
                 } else if (col.key === 'paidFull' || col.key === 'sentToAmazon') {
                     const val = po[col.key];
                     const isYes = val === true || val === 'Yes' || val === 'yes';
                     html += `<td class="${isYes ? 'check-yes' : 'check-no'}" onclick="toggleBoolField('${po.id}','${col.key}')" style="cursor:pointer">${isYes ? '✓' : '—'}</td>`;
                 } else if (col.key === 'entryDate' || col.key === 'paymentDueDate' || col.key === 'eta3pl' || col.key === 'newEta3pl') {
                     html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${fmtDate(po[col.key])}</td>`;
-                } else if (col.key === 'poValueUSD') {
-                    html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${fmt$(po.poValueUSD)}</td>`;
-                } else if (col.key === 'qty') {
-                    html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${fmtNum(po.qty)}</td>`;
+                } else if (col.key === 'poValueUSD' || col.key === 'valueConfirmed') {
+                    const val = Number(po[col.key]) || 0;
+                    html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${val ? fmt$(val) : '<span class="check-no">—</span>'}</td>`;
+                } else if (col.key === 'qty' || col.key === 'qtyConfirmed') {
+                    const val = po[col.key];
+                    html += `<td onclick="startInlineEdit('${po.id}','${col.key}',this)">${val ? fmtNum(val) : '<span class="check-no">—</span>'}</td>`;
                 } else if (col.key === 'channel') {
                     const ch = po.channel || '';
                     const chStyle = ch && ch !== 'Amazon' ? 'color:#f85149;font-weight:600' : '';
@@ -3208,7 +3230,8 @@
                 <h3>Basic Information</h3>
                 <div class="form-grid">
                     ${formField('Entry Date', 'entryDate', po.entryDate, 'date')}
-                    ${formField('Status', 'status', normalizeStatus(po.status), 'select', STATUS_OPTIONS)}
+                    <div class="form-group"><label>Payment Status</label><span class="payment-status-badge ${getPaymentStatusClass(computePaymentStatus(po))}">${computePaymentStatus(po)}</span></div>
+                    ${formField('Logistics Status', 'logisticsStatus', po.logisticsStatus || 'Pending', 'select', LOGISTICS_STATUS_OPTIONS)}
                     ${formField('Account', 'account', po.account, 'select', ['HeartSole', 'Gunyah Trading'])}
                     ${formField('PO Number', 'poNumber', po.poNumber)}
                     ${formField('Supplier', 'supplier', po.supplier, 'datalist', [...new Set(state.purchaseOrders.map(p => p.supplier).filter(Boolean))].sort())}
@@ -3711,9 +3734,9 @@
     }
 
     function exportCSV() {
-        const headers = ['Entry Date', 'Status', 'Account', 'PO #', 'Supplier', 'Brand', 'Type', 'QTY', 'PO Value', 'Import Cost', 'Final Payment', 'Payment Date', 'Payment Method'];
+        const headers = ['Entry Date', 'Payment Status', 'Logistics Status', 'Account', 'PO #', 'Supplier', 'Brand', 'Type', 'QTY', 'PO Value', 'Import Cost', 'Final Payment', 'Payment Date', 'Payment Method'];
         const rows = state.purchaseOrders.map(po => [
-            po.entryDate, normalizeStatus(po.status),
+            po.entryDate, computePaymentStatus(po), po.logisticsStatus || 'Pending',
             po.account, po.poNumber, po.supplier, po.brand, po.type,
             po.qty, po.poValueUSD, po.importCost,
             po.finalPayment, po.finalPaymentDate, po.paymentMethod
@@ -3792,11 +3815,10 @@
 
         state.purchaseOrders.forEach(po => {
             if (!po.paymentDueDate || !po.poValueUSD) return;
-            const status = normalizeStatus(po.status);
-            if (status === 'Cancelled') return;
+            if ((po.logisticsStatus || 'Pending') === 'Cancelled') return;
             const wk = getWeekKey(getMonday(parseLocalDate(po.paymentDueDate)));
-            const isPaid = status === 'Paid Not Shipped' || status === 'Paid and Shipped';
-            const isConfirmed = status !== 'Pending';
+            const isPaid = computePaymentStatus(po) === 'Fully Paid';
+            const isConfirmed = (po.logisticsStatus || 'Pending') !== 'Pending';
             const amount = (isConfirmed && Number(po.valueConfirmed) > 0) ? Number(po.valueConfirmed) : Number(po.poValueUSD);
             const label = po.poNumber || po.supplier;
             if (isPaid) {
@@ -4659,8 +4681,7 @@
         const countedPOIds = new Set();
 
         state.purchaseOrders.forEach(po => {
-            const status = normalizeStatus(po.status);
-            if (status === 'Cancelled') return;
+            if ((po.logisticsStatus || 'Pending') === 'Cancelled') return;
 
             const brand = String(po.brand || 'Unknown').toUpperCase().trim();
             const supplier = String(po.supplier || 'Unknown').toUpperCase().trim();
@@ -4795,13 +4816,12 @@
         }
 
         // Cancelled POs
-        const cancelledPOs = new Set(state.purchaseOrders.filter(p => normalizeStatus(p.status) === 'Cancelled').map(p => p.poNumber));
+        const cancelledPOs = new Set(state.purchaseOrders.filter(p => (p.logisticsStatus || 'Pending') === 'Cancelled').map(p => p.poNumber));
 
         // Build PO-based entries
         const poEntries = [];
         state.purchaseOrders.forEach(po => {
-            const status = normalizeStatus(po.status);
-            if (status === 'Cancelled') return;
+            if ((po.logisticsStatus || 'Pending') === 'Cancelled') return;
             const hasMP = po.payments && Array.isArray(po.payments) && po.payments.length > 0;
             if (!hasMP && matchedPONumbers.has(po.poNumber)) return;
             if (hasMP) {
@@ -4813,7 +4833,7 @@
                     } catch(e) {}
                 });
             } else {
-                const isPaid = status === 'Paid Not Shipped' || status === 'Paid and Shipped';
+                const isPaid = computePaymentStatus(po) === 'Fully Paid';
                 const amount = Number(po.poValueUSD) || 0;
                 if (!po.paymentDueDate) return;
                 try {
@@ -5341,8 +5361,7 @@
             let total = 0;
             state.purchaseOrders.forEach(po => {
                 if (!po.entryDate) return;
-                const status = normalizeStatus(po.status);
-                if (status === 'Cancelled') return;
+                if ((po.logisticsStatus || 'Pending') === 'Cancelled') return;
                 if (po.entryDate >= monStr && po.entryDate <= sunStr) {
                     total += Number(po.poValueUSD) || Number(po.valueConfirmed) || 0;
                 }
@@ -5491,10 +5510,12 @@
                     // Clear default entryDate so formatPOText extracts from PO number
                     if (!po.entryDate) merged.entryDate = '';
                     formatPOText(merged);
-                    merged.status = normalizeStatus(merged.status);
-                    if (merged.status === 'Pending' && merged.entryDate && merged.entryDate < '2025-11-01') {
-                        merged.status = 'Paid and Shipped';
+                    merged.logisticsStatus = normalizeLogisticsStatus(merged.status || merged.logisticsStatus);
+                    if (merged.logisticsStatus === 'Pending' && merged.entryDate && merged.entryDate < '2025-11-01') {
+                        merged.logisticsStatus = 'Shipped to FBA';
+                        if (merged.payments) merged.payments.forEach(p => { if (p.status !== 'paid') p.status = 'paid'; });
                     }
+                    delete merged.status;
                     return merged;
                 });
 
@@ -5717,8 +5738,7 @@
                 // Final payment
                 const finalAmt = Number(po.finalPayment) || 0;
                 const finalDate = po.finalPaymentDate || po.paymentDueDate || '';
-                const poStatus = normalizeStatus(po.status);
-                const finalIsPaid = (poStatus === 'Paid Not Shipped' || poStatus === 'Paid and Shipped');
+                const finalIsPaid = computePaymentStatus(po) === 'Fully Paid';
                 payments.push({
                     id: generateId(),
                     label: 'Final Payment',
@@ -5849,8 +5869,7 @@
             if (resolvedAmounts.length <= 1) return; // Single or no amounts — no splitting needed
 
             // Determine paid/unpaid status for each payment
-            const poStatus = normalizeStatus(po.status);
-            const allPaid = isPaidSection || poStatus === 'Paid Not Shipped' || poStatus === 'Paid and Shipped';
+            const allPaid = isPaidSection || computePaymentStatus(po) === 'Fully Paid';
 
             // Build payments from resolved weekly amounts
             const payments = resolvedAmounts.map(({ date, amount }, idx) => {
@@ -5952,8 +5971,8 @@
         const parts = [];
         if (po.poNumber) parts.push('PO: ' + po.poNumber);
         if (po.supplier) parts.push('Supplier: ' + po.supplier);
-        const status = normalizeStatus(po.status);
-        parts.push('Status: ' + status);
+        parts.push('Payment: ' + computePaymentStatus(po));
+        parts.push('Logistics: ' + (po.logisticsStatus || 'Pending'));
         if (pe.amount) parts.push('Amount: ' + fmt$(pe.amount));
         if (po.paymentDueDate) parts.push('Due: ' + po.paymentDueDate);
         if (po.notes) parts.push('Notes: ' + po.notes);
@@ -5988,8 +6007,8 @@
         if (payments.length > 0) html += `<span class="detail-label">Pay Dates</span><span class="detail-value">${payments.join(' &nbsp;|&nbsp; ')}</span>`;
         if (po?.paymentDueDate) html += `<span class="detail-label">Due Date</span><span class="detail-value">${po.paymentDueDate}</span>`;
         if (po) {
-            const status = normalizeStatus(po.status);
-            html += `<span class="detail-label">Status</span><span class="detail-value">${status}</span>`;
+            html += `<span class="detail-label">Payment</span><span class="detail-value"><span class="payment-status-badge ${getPaymentStatusClass(computePaymentStatus(po))}">${computePaymentStatus(po)}</span></span>`;
+            html += `<span class="detail-label">Logistics</span><span class="detail-value">${po.logisticsStatus || 'Pending'}</span>`;
             if (po.poValueUSD) html += `<span class="detail-label">PO Value</span><span class="detail-value">${fmt$(po.poValueUSD)}</span>`;
             if (po.valueConfirmed) html += `<span class="detail-label">Confirmed</span><span class="detail-value">${fmt$(po.valueConfirmed)}</span>`;
         }
@@ -6003,11 +6022,11 @@
         const po = state.purchaseOrders[poIdx];
         if (!po) return '';
 
-        const status = normalizeStatus(po.status);
         let html = '<div class="detail-grid">';
         if (po.poNumber) html += `<span class="detail-label">PO#</span><span class="detail-value">${po.poNumber}</span>`;
         if (po.supplier) html += `<span class="detail-label">Supplier</span><span class="detail-value">${po.supplier}</span>`;
-        html += `<span class="detail-label">Status</span><span class="detail-value">${status}</span>`;
+        html += `<span class="detail-label">Payment</span><span class="detail-value"><span class="payment-status-badge ${getPaymentStatusClass(computePaymentStatus(po))}">${computePaymentStatus(po)}</span></span>`;
+        html += `<span class="detail-label">Logistics</span><span class="detail-value">${po.logisticsStatus || 'Pending'}</span>`;
 
         // Multi-payment: show full payment schedule
         if (po.payments && po.payments.length > 0) {
@@ -6060,37 +6079,25 @@
         row.classList.toggle('cf-row-expanded', !isOpen);
     }
 
-    // Status badge for cashflow rows — shows PO status, clickable to change
+    // Status badge for cashflow rows — shows payment status, clickable to change
     function cfStatusBadge(poNumber, section, paymentIdx) {
         if (!poNumber) return '';
         const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
         if (!po) return '';
-        const status = normalizeStatus(po.status);
+        const payStatus = computePaymentStatus(po);
+        const cls = getPaymentStatusClass(payStatus);
         const sec = section ? `'${section}'` : 'null';
         const payArg = paymentIdx !== undefined ? `, ${paymentIdx}` : '';
+        const escapedPO = poNumber.replace(/'/g, "\\'");
 
         // In the Paid section, always show "PAID" badge
         if (section === 'paid') {
-            return `<span class="cf-status-badge s-paid-not-shipped" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${poNumber.replace(/'/g, "\\'")}', ${sec}${payArg})" title="Status: ${status} — Click to change">PAID</span>`;
+            return `<span class="payment-status-badge pay-status-fully-paid" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${po.logisticsStatus || 'Pending'} — Click to change" style="cursor:pointer">PAID</span>`;
         }
 
-        const abbrevMap = {
-            'Pending': 'PEND',
-            'Confirmed': 'CONF',
-            'Paid Not Shipped': 'PAID',
-            'Shipped - Not Paid': 'SHIP',
-            'Paid and Shipped': 'DONE'
-        };
-        const classMap = {
-            'Pending': 's-pending',
-            'Confirmed': 's-confirmed',
-            'Paid Not Shipped': 's-paid-not-shipped',
-            'Shipped - Not Paid': 's-shipped-not-paid',
-            'Paid and Shipped': 's-paid-and-shipped'
-        };
-        const abbrev = abbrevMap[status] || status.substring(0, 4).toUpperCase();
-        const cls = classMap[status] || 's-pending';
-        return `<span class="cf-status-badge ${cls}" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${poNumber.replace(/'/g, "\\'")}', ${sec}${payArg})" title="Status: ${status} — Click to change">${abbrev}</span>`;
+        const abbrevMap = { 'Not Paid': 'DUE', 'Partially Paid': 'PART', 'Fully Paid': 'PAID' };
+        const abbrev = abbrevMap[payStatus] || 'DUE';
+        return `<span class="payment-status-badge ${cls}" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${po.logisticsStatus || 'Pending'} — Click to change" style="cursor:pointer">${abbrev}</span>`;
     }
 
     // Find PO number from a legacy cashflow entry (for badge matching)
@@ -6132,12 +6139,12 @@
 
         // Build list of available POs (not already linked)
         const available = state.purchaseOrders
-            .filter(po => po.poNumber && !linkedSet.has(po.poNumber) && normalizeStatus(po.status) !== 'Cancelled')
+            .filter(po => po.poNumber && !linkedSet.has(po.poNumber) && (po.logisticsStatus || 'Pending') !== 'Cancelled')
             .map(po => ({
                 poNumber: po.poNumber,
                 supplier: po.supplier || '',
                 amount: po.valueConfirmed || po.poValueUSD || 0,
-                status: normalizeStatus(po.status)
+                status: computePaymentStatus(po)
             }))
             .sort((a, b) => a.poNumber.localeCompare(b.poNumber));
 
@@ -6224,7 +6231,7 @@
         showToast(`Linked to ${poNumber}`, 'success');
     }
 
-    // Show status dropdown menu
+    // Show status dropdown menu — payment actions only
     function cfShowStatusMenu(event, poNumber, section, paymentIdx) {
         // Remove any existing menu
         const old = document.getElementById('cfStatusMenu');
@@ -6232,7 +6239,6 @@
 
         const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
         if (!po) return;
-        const currentStatus = normalizeStatus(po.status);
         const escapedPO = poNumber.replace(/'/g, "\\'");
         const payArg = paymentIdx !== undefined ? `, ${paymentIdx}` : '';
 
@@ -6241,7 +6247,7 @@
         menu.className = 'cf-status-menu';
 
         if (section === 'paid') {
-            // PAID section: only Move to Unpaid + Delete
+            // PAID section: Move to Unpaid + Cancel
             menu.innerHTML = `
                 <div class="menu-item" onclick="cfMoveToUnpaid('${escapedPO}'${payArg})">
                     <span class="dot" style="background:#d29922"></span>
@@ -6253,23 +6259,14 @@
                     Delete / Cancel PO
                 </div>`;
         } else {
-            // UNPAID section: full status options + cancel
-            const statuses = [
-                { label: 'Pending', color: '#d29922' },
-                { label: 'Confirmed', color: '#3fb950' },
-                { label: 'Paid Not Shipped', color: '#58a6ff' },
-                { label: 'Shipped - Not Paid', color: '#d2a8ff' },
-                { label: 'Paid and Shipped', color: '#238636' }
-            ];
-            menu.innerHTML = statuses.map(s => {
-                const active = s.label === currentStatus ? ' active' : '';
-                return `<div class="menu-item${active}" onclick="cfSetStatus('${escapedPO}', '${s.label}'${payArg})">
-                    <span class="dot" style="background:${s.color}"></span>
-                    ${s.label}${active ? ' ✓' : ''}
-                </div>`;
-            }).join('')
-            + `<div style="border-top:1px solid #30363d;margin:4px 0;"></div>`
-            + `<div class="menu-item" style="color:#f85149;" onclick="cfCancelPO('${escapedPO}')">
+            // UNPAID section: Mark as Paid + Cancel
+            menu.innerHTML = `
+                <div class="menu-item" onclick="cfMarkAsPaid('${escapedPO}'${payArg})">
+                    <span class="dot" style="background:#3fb950"></span>
+                    Mark as Paid
+                </div>
+                <div style="border-top:1px solid #30363d;margin:4px 0;"></div>
+                <div class="menu-item" style="color:#f85149;" onclick="cfCancelPO('${escapedPO}')">
                     <span class="dot" style="background:#f85149"></span>
                     Cancel PO
                 </div>`;
@@ -6303,46 +6300,33 @@
         setTimeout(() => document.addEventListener('click', closeMenu), 0);
     }
 
-    // Set PO status from cashflow dropdown and sync both views
-    function cfSetStatus(poNumber, newStatus, paymentIdx) {
+    // Mark payment(s) as paid from cashflow
+    function cfMarkAsPaid(poNumber, paymentIdx) {
         const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
         if (!po) return;
-        const oldStatus = normalizeStatus(po.status);
 
-        // For multi-payment POs: also update the individual payment status
-        const isPaidStatus = newStatus === 'Paid Not Shipped' || newStatus === 'Paid and Shipped';
         if (po.payments && Array.isArray(po.payments) && po.payments.length > 0) {
             if (paymentIdx !== undefined && paymentIdx !== null && po.payments[paymentIdx]) {
-                // Mark this specific payment as paid/unpaid
-                po.payments[paymentIdx].status = isPaidStatus ? 'paid' : 'unpaid';
-                if (isPaidStatus && !po.payments[paymentIdx].paidDate) {
+                po.payments[paymentIdx].status = 'paid';
+                if (!po.payments[paymentIdx].paidDate) {
                     po.payments[paymentIdx].paidDate = new Date().toISOString().split('T')[0];
                 }
-                if (!isPaidStatus) {
-                    po.payments[paymentIdx].paidDate = '';
-                }
             } else {
-                // No specific payment index — update all payments
                 po.payments.forEach(p => {
-                    p.status = isPaidStatus ? 'paid' : 'unpaid';
-                    if (isPaidStatus && !p.paidDate) p.paidDate = new Date().toISOString().split('T')[0];
-                    if (!isPaidStatus) p.paidDate = '';
+                    p.status = 'paid';
+                    if (!p.paidDate) p.paidDate = new Date().toISOString().split('T')[0];
                 });
             }
         }
 
-        po.status = newStatus;
-        const statusChanges = [{ f: 'status', o: oldStatus, n: newStatus }];
-        if (po.payments && paymentIdx !== undefined && paymentIdx !== null && po.payments[paymentIdx]) {
-            statusChanges.push({ f: `payment[${paymentIdx}].status`, o: isPaidStatus ? 'unpaid' : 'paid', n: po.payments[paymentIdx].status });
-        }
-        recordPOChange(po, 'status', statusChanges);
+        const statusChanges = [{ f: 'paymentStatus', o: 'unpaid', n: 'paid' }];
+        recordPOChange(po, 'paymentStatus', statusChanges);
         saveState();
         const menu = document.getElementById('cfStatusMenu');
         if (menu) menu.remove();
         renderCashflow();
         const payLabel = paymentIdx !== undefined ? ` (payment ${Number(paymentIdx) + 1})` : '';
-        showToast(`${poNumber}${payLabel}: ${oldStatus} → ${newStatus}`, 'success');
+        showToast(`${poNumber}${payLabel}: marked as Paid`, 'success');
     }
 
     // Move PO from paid back to unpaid
@@ -6351,24 +6335,17 @@
         if (menu) menu.remove();
         const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
         if (!po) return;
-        const oldStatus = normalizeStatus(po.status);
 
-        // For multi-payment POs, flip the specific payment to unpaid
+        // Flip the specific payment(s) to unpaid
         if (po.payments && Array.isArray(po.payments) && po.payments.length > 0) {
             if (paymentIdx !== undefined && paymentIdx !== null && po.payments[paymentIdx]) {
                 po.payments[paymentIdx].status = 'unpaid';
                 po.payments[paymentIdx].paidDate = '';
             } else {
-                // No specific payment — flip all to unpaid
                 po.payments.forEach(p => { p.status = 'unpaid'; p.paidDate = ''; });
             }
-            // Derive PO-level status: if any payment still paid, keep as-is; if all unpaid → Pending
-            const anyPaid = po.payments.some(p => p.status === 'paid');
-            if (!anyPaid) po.status = 'Pending';
-        } else {
-            po.status = 'Pending';
         }
-        recordPOChange(po, 'status', [{ f: 'status', o: oldStatus, n: po.status }]);
+        recordPOChange(po, 'paymentStatus', [{ f: 'paymentStatus', o: 'paid', n: 'unpaid' }]);
 
         saveState();
         renderCashflow();
@@ -6413,9 +6390,9 @@
 
         const po = state.purchaseOrders.find(p => p.poNumber === poNumber);
         if (!po) return;
-        const oldStatus = normalizeStatus(po.status);
-        po.status = 'Cancelled';
-        recordPOChange(po, 'status', [{ f: 'status', o: oldStatus, n: 'Cancelled' }]);
+        const oldLogistics = po.logisticsStatus || 'Pending';
+        po.logisticsStatus = 'Cancelled';
+        recordPOChange(po, 'logisticsStatus', [{ f: 'logisticsStatus', o: oldLogistics, n: 'Cancelled' }]);
         saveState();
         renderCashflow();
         showToast(`${poNumber} cancelled and removed from cashflow`, 'success');
@@ -6529,24 +6506,9 @@
             payment.status = 'paid';
             payment.paidDate = new Date().toISOString().split('T')[0];
         }
-        autoUpdatePOStatus(po);
-        recordPOChange(po, 'status', [{ f: `payment[${paymentIdx}].status`, o: oldPayStatus, n: payment.status }]);
+        recordPOChange(po, 'paymentStatus', [{ f: `payment[${paymentIdx}].status`, o: oldPayStatus, n: payment.status }]);
         saveState();
         renderCashflow();
-    }
-
-    // Auto-update PO status based on individual payment statuses
-    function autoUpdatePOStatus(po) {
-        if (!po.payments || po.payments.length === 0) return;
-        const allPaid = po.payments.every(p => p.status === 'paid');
-        const somePaid = po.payments.some(p => p.status === 'paid');
-        const currentStatus = normalizeStatus(po.status);
-        if (currentStatus === 'Cancelled' || currentStatus === 'Paid and Shipped') return;
-        if (allPaid) {
-            po.status = currentStatus === 'Shipped - Not Paid' ? 'Paid and Shipped' : 'Paid Not Shipped';
-        } else if (somePaid && currentStatus === 'Pending') {
-            po.status = 'Confirmed';
-        }
     }
 
     // Edit PO-based cashflow cell — updates PO's amount directly
@@ -6571,8 +6533,7 @@
 
         function save() {
             const newVal = parseFloat(input.value) || 0;
-            const status = normalizeStatus(po.status);
-            const isConfirmed = status !== 'Pending';
+            const isConfirmed = (po.logisticsStatus || 'Pending') !== 'Pending';
             // Determine which field to update and capture old value
             const fieldToChange = (isConfirmed && Number(po.valueConfirmed) > 0) ? 'valueConfirmed' : 'poValueUSD';
             const oldVal = po[fieldToChange];
@@ -6725,8 +6686,7 @@
         let linkColorIdx = 0;
 
         state.purchaseOrders.forEach((po, poIdx) => {
-            const status = normalizeStatus(po.status);
-            if (status === 'Cancelled') return;
+            if ((po.logisticsStatus || 'Pending') === 'Cancelled') return;
 
             const hasMultiPayments = po.payments && Array.isArray(po.payments) && po.payments.length > 0;
 
@@ -6799,7 +6759,7 @@
         });
 
         // Build set of cancelled PO numbers for filtering (includes hardcoded removals)
-        const cancelledPOs = new Set(state.purchaseOrders.filter(p => normalizeStatus(p.status) === 'Cancelled').map(p => p.poNumber));
+        const cancelledPOs = new Set(state.purchaseOrders.filter(p => (p.logisticsStatus || 'Pending') === 'Cancelled').map(p => p.poNumber));
         // Also skip these method names that user explicitly removed
         ['RG24FEB2026NIKE', 'RG24FEB2026SVNIKE', 'RG23FEB2026SVNIKE', 'RG18FEB26NIKE'].forEach(n => cancelledPOs.add(n));
 
@@ -7129,8 +7089,7 @@
             if (!poNum) return 'cf-po-pending'; // no PO match → orange
             const po = state.purchaseOrders.find(p => p.poNumber === poNum);
             if (!po) return 'cf-po-pending';
-            const status = normalizeStatus(po.status);
-            return status === 'Pending' ? 'cf-po-pending' : 'cf-po-confirmed';
+            return (po.logisticsStatus || 'Pending') === 'Pending' ? 'cf-po-pending' : 'cf-po-confirmed';
         }
 
         unpaidItems.forEach(item => {
@@ -7539,12 +7498,12 @@
 
         ['RG24FEB2026SVNIKE', 'RG18FEB26NIKE', 'RG23FEB2026SVNIKE'].forEach(poNum => {
             const po = state.purchaseOrders.find(p => p.poNumber === poNum);
-            if (po && normalizeStatus(po.status) !== 'Cancelled') {
-                po.status = 'Cancelled';
+            if (po && (po.logisticsStatus || 'Pending') !== 'Cancelled') {
+                po.logisticsStatus = 'Cancelled';
             }
         });
-        if (!state.ui.columnFilters || !state.ui.columnFilters.status) {
-            state.ui.columnFilters = { status: new Set(['Pending', 'Paid Not Shipped']) };
+        if (!state.ui.columnFilters || !state.ui.columnFilters.logisticsStatus) {
+            state.ui.columnFilters = { logisticsStatus: new Set(['Pending', 'Confirmed', 'At 3PL', 'Shipped to FBA']) };
         }
 
         // Step 6: Render
