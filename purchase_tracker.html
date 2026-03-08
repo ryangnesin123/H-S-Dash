@@ -6245,8 +6245,10 @@
 
         const logStatus = po.logisticsStatus || 'Pending';
         const logAbbrev = logStatus === 'Pending' ? 'PEND' : 'CONF';
-        const logCls = logStatus === 'Pending' ? 'pay-status-not-paid' : 'log-status-confirmed';
-        return `<span class="payment-status-badge ${logCls}" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${logStatus} — Click to change" style="cursor:pointer">${logAbbrev}</span>`;
+        const badgeStyle = logStatus === 'Pending'
+            ? 'background:rgba(210,153,34,0.15);color:#d29922'
+            : 'background:rgba(63,185,80,0.15);color:#3fb950';
+        return `<span class="payment-status-badge" style="${badgeStyle};cursor:pointer" onclick="event.stopPropagation(); cfShowStatusMenu(event, '${escapedPO}', ${sec}${payArg})" title="Payment: ${payStatus} | Logistics: ${logStatus} — Click to change">${logAbbrev}</span>`;
     }
 
     // Find PO number from a legacy cashflow entry (for badge matching)
@@ -6461,11 +6463,13 @@
 
     function cfGetInitials() {
         let initials = localStorage.getItem('cfUserInitials');
-        if (!initials) {
+        if (!initials || initials.trim() === '') {
             initials = prompt('Enter your initials (e.g. RG):');
-            if (initials) {
+            if (initials && initials.trim()) {
                 initials = initials.trim().toUpperCase().slice(0, 4);
                 localStorage.setItem('cfUserInitials', initials);
+            } else {
+                initials = '';
             }
         }
         return initials || '';
@@ -6577,7 +6581,8 @@
         const initials = cfGetInitials();
         const now = new Date();
         const dateStr = (now.getMonth() + 1) + '/' + now.getDate();
-        const noteText = `${initials} ${dateStr}: ${rawText}`;
+        const prefix = initials ? `${initials} ${dateStr}` : dateStr;
+        const noteText = `${prefix}: ${rawText}`;
 
         const oldNote = cfGetNoteText(po, paymentIdx);
 
