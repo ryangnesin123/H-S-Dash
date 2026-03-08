@@ -5421,7 +5421,15 @@
                     backgroundColor: weekValues.map(v => v > 0 ? '#58a6ff' : 'rgba(88,166,255,0.15)'),
                     borderRadius: numWeeks > 24 ? 2 : 4,
                     barPercentage: numWeeks > 24 ? 0.9 : 0.7,
-                    order: 1
+                    order: 1,
+                    datalabels: {
+                        display: numWeeks <= 12,
+                        color: '#e1e4e8',
+                        anchor: 'end',
+                        align: 'top',
+                        font: { size: 10, weight: '600' },
+                        formatter: function(value) { return value > 0 ? fmt$(value) : ''; }
+                    }
                 }, {
                     label: 'Confirmed',
                     data: weekConfirmedValues,
@@ -5429,7 +5437,15 @@
                     borderRadius: numWeeks > 24 ? 2 : 4,
                     barPercentage: numWeeks > 24 ? 0.9 : 0.7,
                     order: 0,
-                    datalabels: { display: false }
+                    datalabels: {
+                        display: numWeeks <= 12,
+                        color: '#3fb950',
+                        anchor: 'end',
+                        align: 'top',
+                        offset: -2,
+                        font: { size: 9, weight: '600' },
+                        formatter: function(value) { return value > 0 ? fmt$(value) : ''; }
+                    }
                 }]
             },
             options: {
@@ -5460,12 +5476,22 @@
                 plugins: {
                     legend: { display: true, labels: { color: '#8b949e', boxWidth: 12, padding: 10, font: { size: 10 } } },
                     tooltip: {
+                        mode: 'index',
                         callbacks: {
                             title: function(ctx) { return 'Week of ' + weekLabels[ctx[0].dataIndex]; },
+                            afterBody: function(ctx) {
+                                const i = ctx[0].dataIndex;
+                                const conf = weekConfirmedValues[i];
+                                const total = weekValues[i];
+                                if (conf > 0 && total > 0) {
+                                    return `  ${Math.round(conf / total * 100)}% confirmed`;
+                                }
+                                return '';
+                            },
                             label: function(ctx) {
                                 const i = ctx.dataIndex;
                                 if (ctx.datasetIndex === 0) return ` PO Value: ${fmt$(weekValues[i])}`;
-                                if (ctx.datasetIndex === 1 && weekConfirmedValues[i] > 0) return ` Confirmed: ${fmt$(weekConfirmedValues[i])}`;
+                                if (ctx.datasetIndex === 1) return ` Confirmed: ${fmt$(weekConfirmedValues[i])}`;
                                 return null;
                             }
                         },
@@ -5475,16 +5501,7 @@
                         borderColor: '#30363d',
                         borderWidth: 1
                     },
-                    datalabels: {
-                        display: numWeeks <= 12,
-                        color: '#e1e4e8',
-                        anchor: 'end',
-                        align: 'top',
-                        font: { size: 10, weight: '600' },
-                        formatter: function(value) {
-                            return value > 0 ? fmt$(value) : '';
-                        }
-                    }
+                    datalabels: { display: false }
                 }
             },
             plugins: [ChartDataLabels]
