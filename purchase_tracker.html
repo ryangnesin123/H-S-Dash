@@ -841,6 +841,86 @@
             font-weight: 600;
         }
 
+        /* Note indicator: red triangle in top-right corner */
+        .cf-note-indicator {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 10px 10px 0;
+            border-color: transparent #f85149 transparent transparent;
+            cursor: pointer;
+            z-index: 5;
+        }
+        .cf-note-indicator:hover { border-width: 0 12px 12px 0; }
+
+        /* Right-click context menu */
+        .cf-context-menu {
+            position: fixed;
+            z-index: 9999;
+            background: #1c2028;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 4px 0;
+            min-width: 150px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .cf-context-menu .menu-item {
+            padding: 6px 12px;
+            font-size: 12px;
+            color: #e1e4e8;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .cf-context-menu .menu-item:hover { background: #30363d; }
+
+        /* Note popup */
+        .cf-note-popup {
+            position: fixed;
+            z-index: 9999;
+            background: #1c2028;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            padding: 8px;
+            min-width: 240px;
+            max-width: 320px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+        .cf-note-popup textarea {
+            width: 100%;
+            min-height: 60px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 4px;
+            color: #e1e4e8;
+            padding: 6px 8px;
+            font-size: 12px;
+            font-family: inherit;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+        .cf-note-popup textarea:focus { outline: none; border-color: #58a6ff; }
+        .cf-note-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 6px;
+            margin-top: 6px;
+        }
+        .cf-note-actions button {
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            font-size: 11px;
+            cursor: pointer;
+        }
+        .cf-note-save { background: #238636; color: #fff; border-color: #238636; }
+        .cf-note-cancel { background: transparent; color: #8b949e; }
+        .cf-note-delete { background: transparent; color: #f85149; border-color: #f85149; margin-right: auto; }
+
         /* Expandable detail rows for cashflow entries */
         .cf-detail-row td {
             padding: 0 !important;
@@ -6118,6 +6198,8 @@
         }
 
         if (po.notes) html += `<span class="detail-label">Notes</span><span class="detail-value notes-val">${po.notes}</span>`;
+        const cfNote = (paymentIdx !== undefined && po.payments?.[paymentIdx]?.cashflowNote) ? po.payments[paymentIdx].cashflowNote : po.cashflowNote;
+        if (cfNote) html += `<span class="detail-label" style="color:#f85149">CF Note</span><span class="detail-value notes-val" style="color:#f85149">${cfNote}</span>`;
         if (po.eta3pl) html += `<span class="detail-label">ETA 3PL</span><span class="detail-value">${po.eta3pl}</span>`;
         html += '</div>';
         html += changelogHTML(po);
@@ -6372,6 +6454,162 @@
             }
         }
         setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
+    // ---- Cashflow Notes ----
+
+    function cfGetInitials() {
+        let initials = localStorage.getItem('cfUserInitials');
+        if (!initials) {
+            initials = prompt('Enter your initials (e.g. RG):');
+            if (initials) {
+                initials = initials.trim().toUpperCase().slice(0, 4);
+                localStorage.setItem('cfUserInitials', initials);
+            }
+        }
+        return initials || '';
+    }
+
+    function cfGetNoteText(po, paymentIdx) {
+        if (paymentIdx !== null && paymentIdx !== undefined) {
+            return po.payments?.[paymentIdx]?.cashflowNote || '';
+        }
+        return po.cashflowNote || '';
+    }
+
+    function cfShowNoteContextMenu(event, poIdx, paymentIdx) {
+        event.preventDefault();
+        event.stopPropagation();
+        // Remove existing menus/popups
+        ['cfContextMenu', 'cfNotePopup', 'cfStatusMenu'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        });
+
+        const po = state.purchaseOrders[poIdx];
+        if (!po) return;
+        const existingNote = cfGetNoteText(po, paymentIdx);
+        const payArg = paymentIdx !== null && paymentIdx !== undefined ? paymentIdx : 'null';
+
+        const menu = document.createElement('div');
+        menu.id = 'cfContextMenu';
+        menu.className = 'cf-context-menu';
+
+        let html = `<div class="menu-item" onclick="cfEditNote(event, ${poIdx}, ${payArg})">${existingNote ? '✏️ Edit Note' : '📌 Add Note'}</div>`;
+        if (existingNote) {
+            html += `<div style="border-top:1px solid #30363d;margin:4px 0;"></div>`;
+            html += `<div class="menu-item" style="color:#f85149;" onclick="cfDeleteNote(${poIdx}, ${payArg})">🗑 Delete Note</div>`;
+        }
+        menu.innerHTML = html;
+        document.body.appendChild(menu);
+
+        menu.style.left = event.clientX + 'px';
+        menu.style.top = event.clientY + 'px';
+        requestAnimationFrame(() => {
+            const r = menu.getBoundingClientRect();
+            if (r.right > window.innerWidth) menu.style.left = (window.innerWidth - r.width - 8) + 'px';
+            if (r.bottom > window.innerHeight) menu.style.top = (window.innerHeight - r.height - 8) + 'px';
+        });
+
+        function closeMenu(e) {
+            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
+        }
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
+    function cfEditNote(event, poIdx, paymentIdx) {
+        event.stopPropagation();
+        ['cfContextMenu', 'cfNotePopup'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.remove();
+        });
+
+        const po = state.purchaseOrders[poIdx];
+        if (!po) return;
+        const existing = cfGetNoteText(po, paymentIdx);
+        // Strip the "INITIALS M/D: " prefix for editing
+        const editText = existing.replace(/^[A-Z]{1,4}\s+\d{1,2}\/\d{1,2}:\s*/, '');
+        const payArg = paymentIdx !== null && paymentIdx !== undefined ? paymentIdx : 'null';
+
+        const popup = document.createElement('div');
+        popup.id = 'cfNotePopup';
+        popup.className = 'cf-note-popup';
+
+        let actionsHTML = `<div class="cf-note-actions">`;
+        if (existing) actionsHTML += `<button class="cf-note-delete" onclick="cfDeleteNote(${poIdx}, ${payArg})">Delete</button>`;
+        actionsHTML += `<button class="cf-note-cancel" onclick="document.getElementById('cfNotePopup').remove()">Cancel</button>`;
+        actionsHTML += `<button class="cf-note-save" onclick="cfSaveNote(${poIdx}, ${payArg})">Save</button>`;
+        actionsHTML += `</div>`;
+
+        popup.innerHTML = `<textarea id="cfNoteTextarea" placeholder="Enter note...">${editText}</textarea>${actionsHTML}`;
+        document.body.appendChild(popup);
+
+        const rect = event.target.getBoundingClientRect();
+        popup.style.left = rect.left + 'px';
+        popup.style.top = (rect.bottom + 4) + 'px';
+        requestAnimationFrame(() => {
+            const r = popup.getBoundingClientRect();
+            if (r.right > window.innerWidth) popup.style.left = (window.innerWidth - r.width - 8) + 'px';
+            if (r.bottom > window.innerHeight) popup.style.top = (rect.top - r.height - 4) + 'px';
+        });
+
+        const ta = document.getElementById('cfNoteTextarea');
+        ta.focus();
+        ta.setSelectionRange(ta.value.length, ta.value.length);
+
+        // Close on outside click
+        function closePopup(e) {
+            if (!popup.contains(e.target)) { popup.remove(); document.removeEventListener('mousedown', closePopup); }
+        }
+        setTimeout(() => document.addEventListener('mousedown', closePopup), 0);
+    }
+
+    function cfSaveNote(poIdx, paymentIdx) {
+        const ta = document.getElementById('cfNoteTextarea');
+        if (!ta) return;
+        const rawText = ta.value.trim();
+        if (!rawText) return;
+
+        const po = state.purchaseOrders[poIdx];
+        if (!po) return;
+
+        const initials = cfGetInitials();
+        const now = new Date();
+        const dateStr = (now.getMonth() + 1) + '/' + now.getDate();
+        const noteText = `${initials} ${dateStr}: ${rawText}`;
+
+        const oldNote = cfGetNoteText(po, paymentIdx);
+
+        if (paymentIdx !== null && paymentIdx !== undefined) {
+            if (po.payments && po.payments[paymentIdx]) po.payments[paymentIdx].cashflowNote = noteText;
+        } else {
+            po.cashflowNote = noteText;
+        }
+
+        recordPOChange(po, 'cashflowNote', [{ f: 'cashflowNote', o: oldNote, n: noteText }]);
+        saveState();
+        const popup = document.getElementById('cfNotePopup');
+        if (popup) popup.remove();
+        renderCashflow();
+        showToast('Note saved', 'success');
+    }
+
+    function cfDeleteNote(poIdx, paymentIdx) {
+        const po = state.purchaseOrders[poIdx];
+        if (!po) return;
+        const oldNote = cfGetNoteText(po, paymentIdx);
+
+        if (paymentIdx !== null && paymentIdx !== undefined) {
+            if (po.payments && po.payments[paymentIdx]) delete po.payments[paymentIdx].cashflowNote;
+        } else {
+            delete po.cashflowNote;
+        }
+
+        recordPOChange(po, 'cashflowNote', [{ f: 'cashflowNote', o: oldNote, n: '' }]);
+        saveState();
+        ['cfNotePopup', 'cfContextMenu'].forEach(id => { const el = document.getElementById(id); if (el) el.remove(); });
+        renderCashflow();
+        showToast('Note deleted', 'success');
     }
 
     // Mark payment(s) as paid from cashflow
@@ -7262,7 +7500,11 @@
                 const rowId = pe.isMultiPayment ? `cf-unpaid-po-${pe.poIdx}-pay-${pe.paymentIdx}` : `cf-unpaid-po-${pe.poIdx}`;
                 const linkStyle = pe.isMultiPayment ? ` style="border-left:3px solid ${pe.linkColor};padding-left:6px"` : '';
                 const subLabel = pe.isMultiPayment && pe.paymentLabel ? `<span class="cf-payment-sublabel">[${pe.paymentLabel}]</span>` : '';
-                html += `<tr id="${rowId}" class="cf-section-unpaid ${colorCls} cf-row-clickable"${unpaidHidden}><td class="row-label"${linkStyle} onclick="cfToggleDetail('${rowId}')">${badge}${pe.label}${subLabel}</td>`;
+                const poPE = state.purchaseOrders[pe.poIdx];
+                const noteText = pe.isMultiPayment ? (poPE?.payments?.[pe.paymentIdx]?.cashflowNote || '') : (poPE?.cashflowNote || '');
+                const noteInd = noteText ? `<span class="cf-note-indicator" onclick="event.stopPropagation(); cfEditNote(event, ${pe.poIdx}, ${pe.isMultiPayment ? pe.paymentIdx : 'null'})" title="${noteText.replace(/"/g, '&quot;')}"></span>` : '';
+                const payArg = pe.isMultiPayment ? pe.paymentIdx : 'null';
+                html += `<tr id="${rowId}" class="cf-section-unpaid ${colorCls} cf-row-clickable"${unpaidHidden}><td class="row-label"${linkStyle} onclick="cfToggleDetail('${rowId}')" oncontextmenu="cfShowNoteContextMenu(event, ${pe.poIdx}, ${payArg})">${badge}${pe.label}${subLabel}${noteInd}</td>`;
                 weeks.forEach(d => {
                     const wk = getWeekKey(d);
                     const amt = wk === pe.weekKey ? pe.amount : 0;
