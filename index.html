@@ -681,13 +681,7 @@
             iconClass: 'icon-green',
             supplierCreditsSection: true,
             customHeaders: ['Supplier', 'Units', '$ Value', 'PO#'],
-            metrics: [
-                { name: 'Supplier1' },
-                { name: 'Supplier2' },
-                { name: 'Supplier3' },
-                { name: 'Supplier4' },
-                { name: 'TOTAL', isTotal: true },
-            ]
+            metrics: [] // Dynamically populated from CSV
         },
     ];
 
@@ -1036,40 +1030,41 @@
         }
 
         // Parse supplier credits data (right side, col 8=name, 9=units, 10=$ value, 11=PO#)
-        const supplierCredits = {};
+        // Dynamically reads all rows between "Credits Owing To Us" header and "TOTAL"
+        const supplierCreditRows = [];
         let inCreditsSection = false;
         for (const row of rows) {
             if (!row || row.length < 9) continue;
             const col8 = (row[8] || '').trim();
             if (col8 === 'Credits Owing To Us') { inCreditsSection = true; continue; }
             if (inCreditsSection && col8) {
-                const key = col8.toLowerCase();
-                supplierCredits[key] = {
+                supplierCreditRows.push({
+                    name: col8,
                     units: (row[9] || '').trim(),
                     value: (row[10] || '').trim(),
-                    po: (row[11] || '').trim()
-                };
-                if (key === 'total') inCreditsSection = false;
+                    po: (row[11] || '').trim(),
+                    isTotal: col8.toUpperCase() === 'TOTAL'
+                });
+                if (col8.toUpperCase() === 'TOTAL') inCreditsSection = false;
             }
         }
 
         // Now update each section's metrics
         SECTIONS.forEach(section => {
-            // Supplier credits section
+            // Supplier credits section — dynamically build rows from CSV
             if (section.supplierCreditsSection) {
                 const tbody = document.getElementById('tbody-supplier_credits');
                 if (!tbody) return;
-                const trs = tbody.querySelectorAll('tr');
-                section.metrics.forEach((metric, i) => {
-                    if (!trs[i]) return;
-                    const key = metric.name.toLowerCase();
-                    const data = supplierCredits[key];
-                    const tds = trs[i].querySelectorAll('td');
-                    if (data) {
-                        tds[1].textContent = formatValue(data.units);
-                        tds[2].textContent = formatValue(data.value);
-                        tds[3].textContent = formatValue(data.po);
-                    }
+                tbody.innerHTML = '';
+                supplierCreditRows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    if (row.isTotal) tr.className = 'assets-total-row';
+                    tr.innerHTML =
+                        '<td><div class="metric-name">' + row.name + '</div></td>' +
+                        '<td style="text-align:right">' + formatValue(row.units) + '</td>' +
+                        '<td style="text-align:right">' + formatValue(row.value) + '</td>' +
+                        '<td style="text-align:right">' + formatValue(row.po) + '</td>';
+                    tbody.appendChild(tr);
                 });
                 return;
             }
