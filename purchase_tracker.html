@@ -2629,13 +2629,26 @@
         if (!po) return;
         const oldPayStatus = computePaymentStatus(po);
         if (newStatus === oldPayStatus) return;
-        if (po.payments && Array.isArray(po.payments) && po.payments.length > 0) {
-            if (newStatus === 'Fully Paid') {
-                po.payments.forEach(p => { p.status = 'paid'; if (!p.paidDate) p.paidDate = new Date().toISOString().split('T')[0]; });
-            } else if (newStatus === 'Not Paid') {
-                po.payments.forEach(p => { p.status = 'unpaid'; delete p.paidDate; });
-            }
+
+        // Create payments array if missing (legacy POs)
+        if (!po.payments || !Array.isArray(po.payments) || po.payments.length === 0) {
+            const amt = Number(po.valueConfirmed) > 0 ? Number(po.valueConfirmed) : (Number(po.poValueUSD) || 0);
+            po.payments = [{
+                id: 'pay-' + Date.now(),
+                label: 'Full Payment',
+                amount: amt,
+                dueDate: po.paymentDueDate || '',
+                status: 'unpaid',
+                method: ''
+            }];
         }
+
+        if (newStatus === 'Fully Paid') {
+            po.payments.forEach(p => { p.status = 'paid'; if (!p.paidDate) p.paidDate = new Date().toISOString().split('T')[0]; });
+        } else if (newStatus === 'Not Paid') {
+            po.payments.forEach(p => { p.status = 'unpaid'; delete p.paidDate; });
+        }
+
         recordPOChange(po, 'paymentStatus', [{ f: 'paymentStatus', o: oldPayStatus, n: newStatus }]);
         saveState();
         renderPOTable();
