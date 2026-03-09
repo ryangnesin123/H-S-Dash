@@ -2306,6 +2306,10 @@
     function normalizePOs() {
         (state.purchaseOrders || []).forEach((po, i) => {
             if (po._rowIndex == null) po._rowIndex = i;
+            // Fix Firebase array-to-object conversion for nested payments array
+            if (po.payments && !Array.isArray(po.payments)) {
+                po.payments = firebaseToArray(po.payments);
+            }
             formatPOText(po);
             // Migrate old combined status → logisticsStatus
             if (!po.logisticsStatus && po.status) {
