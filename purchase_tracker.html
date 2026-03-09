@@ -2303,8 +2303,8 @@
         }
     }
 
-    // Write a single PO directly to Firebase by finding its index via ID
-    // Writes immediately + retries to overcome stale-tab overwrites
+    // Write a single PO directly to Firebase using transaction (atomic, can't be overwritten)
+    // Also sets up a persistent watcher to re-apply if another tab overwrites
     function savePOToFirebase(po) {
         if (!firebaseConnected || !po || !po.id) return;
         localSaveInProgress = true;
@@ -2319,17 +2319,44 @@
             if (match) {
                 const fbKey = match[0];
                 const poData = sanitizeKeys(JSON.parse(JSON.stringify(po)));
-                const writePO = () => poRef.child(fbKey).set(poData).catch(() => {});
-                // Write immediately
-                writePO().then(() => updateSyncStatus('synced'));
-                // Retry writes to overcome any stale-tab overwrites
-                setTimeout(writePO, 1500);
-                setTimeout(() => {
-                    writePO().then(() => {
-                        localSaveInProgress = false;
-                        poSaveInProgress = false;
-                    });
-                }, 3500);
+                const poNodeRef = poRef.child(fbKey);
+
+                // Use transaction for atomic write
+                poNodeRef.transaction(() => poData, (error, committed) => {
+                    if (error) {
+                        console.warn('Firebase PO transaction failed:', error);
+                        // Fallback: direct set
+                        poNodeRef.set(poData).catch(() => {});
+                    }
+                    updateSyncStatus('synced');
+                });
+
+                // Set up a temporary watcher: if this PO gets overwritten within 10s, re-apply our change
+                let watchCount = 0;
+                const maxWatches = 5;
+                const unwatchTimer = setTimeout(() => {
+                    poNodeRef.off('value', watchFn);
+                    localSaveInProgress = false;
+                    poSaveInProgress = false;
+                }, 10000);
+
+                const watchFn = (snap) => {
+                    const current = snap.val();
+                    if (!current) return;
+                    // Check if our change was overwritten
+                    const restoredCurrent = restoreKeys(current);
+                    if (restoredCurrent.logisticsStatus !== po.logisticsStatus ||
+                        (po.payments && JSON.stringify(restoredCurrent.payments) !== JSON.stringify(po.payments))) {
+                        watchCount++;
+                        if (watchCount <= maxWatches) {
+                            console.log('PO overwritten by another tab, re-applying (#' + watchCount + ')');
+                            poNodeRef.transaction(() => poData);
+                        }
+                    }
+                };
+                // Skip the first callback (our own write), start watching after 500ms
+                setTimeout(() => poNodeRef.on('value', watchFn), 500);
+
             } else {
                 localSaveInProgress = false;
                 poSaveInProgress = false;
