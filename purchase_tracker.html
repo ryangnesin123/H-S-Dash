@@ -1523,7 +1523,7 @@
 <body>
     <!-- HEADER -->
     <div class="header">
-        <h1>H&S <span>Purchase Tracker</span> & Cash Flow <span style="font-size:10px;color:#484f58;font-weight:normal" id="appVersion">v12</span></h1>
+        <h1>H&S <span>Purchase Tracker</span> & Cash Flow <span style="font-size:10px;color:#484f58;font-weight:normal" id="appVersion">v13</span></h1>
         <div class="header-right">
             <div class="sync-status">
                 <div class="sync-dot" id="syncDot"></div>
@@ -2321,11 +2321,23 @@
                 const poNodeRef = poRef.child(fbKey);
 
                 // Use transaction for atomic write
+                showToast('Saving to Firebase (key=' + fbKey + ')...', 'info');
                 poNodeRef.transaction(() => poData, (error, committed) => {
                     if (error) {
-                        console.warn('Firebase PO transaction failed:', error);
-                        // Fallback: direct set
+                        showToast('Transaction FAILED: ' + error.message, 'error');
                         poNodeRef.set(poData).catch(() => {});
+                    } else if (committed) {
+                        showToast('Firebase write OK! Verifying...', 'success');
+                        // Verify the write
+                        setTimeout(() => {
+                            poNodeRef.once('value').then(snap => {
+                                const v = snap.val();
+                                const r = restoreKeys(v || {});
+                                showToast('Firebase has: ' + (r.logisticsStatus || 'NULL'), r.logisticsStatus === po.logisticsStatus ? 'success' : 'error');
+                            });
+                        }, 1000);
+                    } else {
+                        showToast('Transaction not committed', 'error');
                     }
                     updateSyncStatus('synced');
                 });
