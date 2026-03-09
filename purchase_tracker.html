@@ -2283,7 +2283,7 @@
             updateSyncStatus('saving');
             firebaseSaveTimer = setTimeout(() => {
                 const dataToSync = getDataState();
-                firebaseRef.set(dataToSync)
+                firebaseRef.update(dataToSync)
                     .then(() => {
                         updateSyncStatus('synced');
                         setTimeout(() => { localSaveInProgress = false; }, 200);
