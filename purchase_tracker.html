@@ -2623,6 +2623,15 @@
         }
     }
 
+    function handleLogisticsChange(poId, selectEl) {
+        const val = selectEl.value;
+        if (val === '__DELETE__') {
+            deletePO(poId, selectEl);
+        } else {
+            changeLogisticsStatus(poId, val);
+        }
+    }
+
     function deletePO(poId, selectEl) {
         const po = state.purchaseOrders.find(p => p.id === poId);
         if (!po) return;
@@ -2961,7 +2970,7 @@
                     const logStatus = po.logisticsStatus || 'Pending';
                     const cls = getLogisticsStatusClass(logStatus);
                     const opts = LOGISTICS_STATUS_OPTIONS.map(s => `<option value="${s}" ${s === logStatus ? 'selected' : ''}>${s}</option>`).join('');
-                    html += `<td><select class="status-select ${cls}" onchange="if(this.value==='__DELETE__'){deletePO('${po.id}',this)}else{changeLogisticsStatus('${po.id}', this.value, event)}">${opts}<option value="__DELETE__" style="color:#f85149">🗑 Delete PO</option></select></td>`;
+                    html += `<td><select class="status-select ${cls}" onchange="handleLogisticsChange('${po.id}', this)">${opts}<option value="__DELETE__" style="color:#f85149">🗑 Delete PO</option></select></td>`;
                 } else if (col.key === 'paidFull' || col.key === 'sentToAmazon') {
                     const val = po[col.key];
                     const isYes = val === true || val === 'Yes' || val === 'yes';
