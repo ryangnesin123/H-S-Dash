@@ -2285,10 +2285,9 @@
             updateSyncStatus('saving');
             firebaseSaveTimer = setTimeout(() => {
                 const dataToSync = getDataState();
-                // If a targeted PO save just ran, skip the purchaseOrders overwrite
-                if (poSaveInProgress) {
-                    delete dataToSync.purchaseOrders;
-                }
+                // Never write full purchaseOrders array — use savePOToFirebase for PO changes
+                // This prevents any browser from clobbering individual PO edits
+                delete dataToSync.purchaseOrders;
                 firebaseRef.update(dataToSync)
                     .then(() => {
                         updateSyncStatus('synced');
@@ -2753,9 +2752,33 @@
         pushUndo({ type: 'deletePO', po: JSON.parse(JSON.stringify(po)), index: idx });
         state.purchaseOrders.splice(idx, 1);
         saveState();
+        // Remove directly from Firebase
+        deletePOFromFirebase(poId);
         renderPOTable();
         renderCashflow();
         showToast(`Deleted PO "${label}"`);
+    }
+
+    function deletePOFromFirebase(poId) {
+        if (!firebaseConnected) return;
+        localSaveInProgress = true;
+        const poRef = firebaseRef.child('purchaseOrders');
+        poRef.once('value').then(snapshot => {
+            const data = snapshot.val();
+            if (!data) { localSaveInProgress = false; return; }
+            const entries = Object.entries(data);
+            const match = entries.find(([k, v]) => v && v.id === poId);
+            if (match) {
+                poRef.child(match[0]).remove()
+                    .then(() => {
+                        updateSyncStatus('synced');
+                        setTimeout(() => { localSaveInProgress = false; }, 500);
+                    })
+                    .catch(() => { localSaveInProgress = false; });
+            } else {
+                localSaveInProgress = false;
+            }
+        });
     }
 
     function changePaymentStatus(poId, newStatus, event) {
