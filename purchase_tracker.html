@@ -3381,7 +3381,7 @@
                 <h3>Basic Information</h3>
                 <div class="form-grid">
                     ${formField('Entry Date', 'entryDate', po.entryDate, 'date')}
-                    <div class="form-group"><label>Payment Status</label><span class="payment-status-badge ${getPaymentStatusClass(computePaymentStatus(po))}">${computePaymentStatus(po)}</span></div>
+                    <div class="form-group"><label>Payment Status</label><select id="formPaymentStatus" class="form-input ${getPaymentStatusClass(computePaymentStatus(po))}">${['Not Paid', 'Partially Paid', 'Fully Paid'].map(s => `<option value="${s}" ${s === computePaymentStatus(po) ? 'selected' : ''} ${s === 'Partially Paid' && computePaymentStatus(po) !== 'Partially Paid' ? 'hidden' : ''}>${s}</option>`).join('')}</select></div>
                     ${formField('Logistics Status', 'logisticsStatus', po.logisticsStatus || 'Pending', 'select', LOGISTICS_STATUS_OPTIONS)}
                     ${formField('Account', 'account', po.account, 'select', ['HeartSole', 'Gunyah Trading'])}
                     ${formField('PO Number', 'poNumber', po.poNumber)}
@@ -3853,6 +3853,29 @@
                         const oldPayAmt = updatedPO.payments[0].amount;
                         updatedPO.payments[0].amount = effectiveAmt;
                         recordPOChange(updatedPO, 'form', [{ f: 'payment[0].amount', o: oldPayAmt, n: effectiveAmt }]);
+                    }
+                }
+
+                // Apply payment status change from form dropdown
+                const formPaySel = document.getElementById('formPaymentStatus');
+                if (formPaySel) {
+                    const newPayStatus = formPaySel.value;
+                    const po = updatedPO;
+                    if (!po.payments || !Array.isArray(po.payments) || po.payments.length === 0) {
+                        const amt = Number(po.valueConfirmed) > 0 ? Number(po.valueConfirmed) : (Number(po.poValueUSD) || 0);
+                        po.payments = [{
+                            id: 'pay-' + Date.now(),
+                            label: 'Full Payment',
+                            amount: amt,
+                            dueDate: po.paymentDueDate || '',
+                            status: 'unpaid',
+                            method: ''
+                        }];
+                    }
+                    if (newPayStatus === 'Fully Paid') {
+                        po.payments.forEach(p => { p.status = 'paid'; if (!p.paidDate) p.paidDate = new Date().toISOString().split('T')[0]; });
+                    } else if (newPayStatus === 'Not Paid') {
+                        po.payments.forEach(p => { p.status = 'unpaid'; delete p.paidDate; });
                     }
                 }
 
