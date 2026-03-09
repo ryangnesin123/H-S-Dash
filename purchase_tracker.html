@@ -3250,6 +3250,11 @@
         recordPOChange(po, 'inline', [{ f: colKey, o: oldValue, n: po[colKey] }]);
         formatPOText(po);
 
+        // Sync paymentDueDate → single-payment dueDate for cashflow
+        if (colKey === 'paymentDueDate' && po.payments && Array.isArray(po.payments) && po.payments.length === 1 && !po.payments[0].dueDate) {
+            po.payments[0].dueDate = po[colKey];
+        }
+
         // Sync value changes → single-payment amount for cashflow
         if ((colKey === 'valueConfirmed' || colKey === 'poValueUSD') && po.payments && Array.isArray(po.payments) && po.payments.length === 1) {
             const effectiveAmt = (Number(po.valueConfirmed) > 0) ? Number(po.valueConfirmed) : Number(po.poValueUSD) || 0;
@@ -7062,8 +7067,13 @@
                 const baseLabel = po.poNumber || po.supplier || 'PO';
 
                 po.payments.forEach((payment, payIdx) => {
-                    if (!payment.dueDate || !payment.amount) return;
-                    const wk = getWeekKey(getMonday(parseLocalDate(payment.dueDate)));
+                    // Sync: if payment has no dueDate but PO does, copy it over
+                    if (!payment.dueDate && po.paymentDueDate) {
+                        payment.dueDate = po.paymentDueDate;
+                    }
+                    const effDueDate = payment.dueDate || po.paymentDueDate || '';
+                    if (!effDueDate || !payment.amount) return;
+                    const wk = getWeekKey(getMonday(parseLocalDate(effDueDate)));
                     const isPaid = payment.status === 'paid';
                     const label = `${baseLabel} (${payIdx + 1}/${po.payments.length})` + (po.supplier ? '-' + po.supplier : '');
 
@@ -7082,7 +7092,7 @@
                         linkColor,
                         totalPayments: po.payments.length,
                         paymentLabel: payment.label || '',
-                        paymentDueDate: payment.dueDate
+                        paymentDueDate: effDueDate
                     });
                 });
             } else {
