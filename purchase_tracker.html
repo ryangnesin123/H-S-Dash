@@ -1730,6 +1730,7 @@
     const FIREBASE_SAVE_DELAY = 800; // ms debounce
     let localSaveInProgress = false; // Block listener during save
     let poSaveInProgress = false; // Skip full PO write when targeted save is active
+    const dirtyPOIds = new Map(); // PO IDs modified locally → timestamp. Listener won't overwrite these.
 
     // Extract only sync-worthy data from state (excludes ephemeral UI)
     function getDataState() {
@@ -2461,6 +2462,30 @@
 
             // Restore sanitized keys and apply remote data (preserve UI state)
             const restored = restoreKeys(data);
+
+            // Preserve locally-dirty POs — don't let remote data overwrite recent local changes
+            const now = Date.now();
+            const DIRTY_TTL = 15000; // 15 seconds protection window
+            if (dirtyPOIds.size > 0) {
+                // Build map of local dirty POs by ID
+                const localPOMap = {};
+                state.purchaseOrders.forEach(po => {
+                    if (po.id && dirtyPOIds.has(po.id) && (now - dirtyPOIds.get(po.id)) < DIRTY_TTL) {
+                        localPOMap[po.id] = po;
+                    }
+                });
+                // Merge: use incoming POs but overlay local dirty POs
+                incomingPOs.forEach((iPO, idx) => {
+                    if (iPO && iPO.id && localPOMap[iPO.id]) {
+                        incomingPOs[idx] = localPOMap[iPO.id];
+                    }
+                });
+                // Clean up expired dirty entries
+                for (const [id, ts] of dirtyPOIds) {
+                    if (now - ts >= DIRTY_TTL) dirtyPOIds.delete(id);
+                }
+            }
+
             state.purchaseOrders = incomingPOs;
             state.cashflowSettings = restored.cashflowSettings || state.cashflowSettings;
             // Fix Firebase array-to-object conversion for nested arrays
@@ -2670,6 +2695,7 @@
                     po.payments[0].amount = effectiveAmt;
                 }
             }
+            dirtyPOIds.set(po.id, Date.now()); // Protect from listener overwrite
             saveState();
             savePOToFirebase(po); // Write just this PO directly
             renderPOTable();
@@ -2732,8 +2758,9 @@
         }
 
         recordPOChange(po, 'paymentStatus', [{ f: 'paymentStatus', o: oldPayStatus, n: newStatus }]);
+        dirtyPOIds.set(po.id, Date.now());
         saveState();
-        savePOToFirebase(po); // Write just this PO directly
+        savePOToFirebase(po);
         renderPOTable();
         renderCashflow();
         showToast(`Payment status → ${newStatus}`);
@@ -3348,8 +3375,9 @@
             }
         }
 
+        dirtyPOIds.set(po.id, Date.now());
         saveState();
-        savePOToFirebase(po); // Write just this PO directly
+        savePOToFirebase(po);
         renderPOTableBody();
     }
 
@@ -3935,7 +3963,8 @@
                     }
                 }
 
-                savePOToFirebase(updatedPO); // Write just this PO directly
+                dirtyPOIds.set(updatedPO.id, Date.now());
+                savePOToFirebase(updatedPO);
                 showToast('Purchase order updated', 'success');
             }
         } else {
