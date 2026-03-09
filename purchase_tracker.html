@@ -1728,6 +1728,7 @@
     // Debounce timer for Firebase writes
     let firebaseSaveTimer = null;
     const FIREBASE_SAVE_DELAY = 800; // ms debounce
+    let localSaveInProgress = false; // Block listener during save
 
     // Extract only sync-worthy data from state (excludes ephemeral UI)
     function getDataState() {
@@ -2278,14 +2279,19 @@
         // Debounced write to Firebase (skip if triggered by a remote update)
         if (firebaseConnected && !isRemoteUpdate) {
             clearTimeout(firebaseSaveTimer);
+            localSaveInProgress = true; // Block listener from overwriting
             updateSyncStatus('saving');
             firebaseSaveTimer = setTimeout(() => {
                 const dataToSync = getDataState();
                 firebaseRef.set(dataToSync)
-                    .then(() => { updateSyncStatus('synced'); })
+                    .then(() => {
+                        updateSyncStatus('synced');
+                        setTimeout(() => { localSaveInProgress = false; }, 200);
+                    })
                     .catch(err => {
                         console.warn('Firebase write failed:', err);
                         updateSyncStatus('error');
+                        localSaveInProgress = false;
                     });
             }, FIREBASE_SAVE_DELAY);
         }
@@ -2398,6 +2404,9 @@
         firebaseListenerActive = true;
 
         firebaseRef.on('value', (snapshot) => {
+            // Skip if we're in the middle of saving locally — prevents race condition
+            if (localSaveInProgress) return;
+
             const data = snapshot.val();
             if (!data || !data.purchaseOrders) return;
 
