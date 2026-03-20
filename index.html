@@ -396,6 +396,7 @@
                 <span id="syncText">Connecting...</span>
             </div>
             <button class="btn-refresh" onclick="fetchData()">Refresh</button>
+            <a id="openSheetLink" href="#" target="_blank" rel="noopener" style="color:#58a6ff;font-size:13px;text-decoration:none;margin-left:12px;white-space:nowrap;" title="Open source spreadsheet">Open Sheet ↗</a>
         </div>
     </div>
 
@@ -914,6 +915,19 @@
         return raw;
     }
 
+    function updateOpenSheetLink() {
+        const raw = document.getElementById('sheetUrl').value.trim();
+        const link = document.getElementById('openSheetLink');
+        const idMatch = raw.match(/\/d\/([a-zA-Z0-9_-]+)/);
+        const gidMatch = raw.match(/gid=(\d+)/);
+        if (idMatch) {
+            const gid = gidMatch ? gidMatch[1] : '0';
+            link.href = 'https://docs.google.com/spreadsheets/d/' + idMatch[1] + '/edit#gid=' + gid;
+        } else {
+            link.href = raw;
+        }
+    }
+
     function parseCSV2D(text) {
         const lines = [];
         let currentLine = [];
@@ -1364,6 +1378,7 @@
         if (input) {
             localStorage.setItem('hs_sheet_input', input);
         }
+        updateOpenSheetLink();
         fetchData();
     }
 
@@ -1385,6 +1400,7 @@
     // Restore saved sheet URL, or use default
     const savedInput = localStorage.getItem('hs_sheet_input') || DEFAULT_SHEET_URL;
     document.getElementById('sheetUrl').value = savedInput;
+    updateOpenSheetLink();
     fetchData();
     startAutoRefresh();
     </script>
