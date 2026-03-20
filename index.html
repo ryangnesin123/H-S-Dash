@@ -261,9 +261,34 @@
         }
 
         .data-table td.val-positive { color: #3fb950; font-weight: 600; }
-        .data-table td.val-negative { color: #f85149; font-weight: 600; }
+        .data-table td.val-negative { color: #f85149; font-weight: 600; animation: pulse-red 2s ease-in-out infinite; }
         .data-table td.val-warning { color: #d29922; font-weight: 600; }
         .data-table td.val-neutral { color: #c9d1d9; }
+
+        @keyframes pulse-red {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .status-emoji { margin-left: 4px; font-size: 12px; }
+        .streak-fire { margin-left: 6px; font-size: 13px; animation: fire-bounce 1s ease-in-out infinite; }
+        @keyframes fire-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+
+        .health-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 12px;
+            font-weight: 500;
+            white-space: nowrap;
+        }
+        .health-badge.health-great { background: rgba(63,185,80,0.15); color: #3fb950; }
+        .health-badge.health-good { background: rgba(63,185,80,0.10); color: #3fb950; }
+        .health-badge.health-mixed { background: rgba(210,153,34,0.15); color: #d29922; }
+        .health-badge.health-poor { background: rgba(248,81,73,0.15); color: #f85149; }
 
         .critical-row {
             background: rgba(248, 81, 73, 0.06);
@@ -704,6 +729,7 @@
                     <div class="section-title">
                         <div class="section-icon ${section.iconClass}">${section.icon}</div>
                         ${section.title}
+                        <span class="health-badge" id="health-${section.id}" style="display:none"></span>
                     </div>
                     <svg class="chevron" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/>
@@ -1113,6 +1139,7 @@
 
             const trs = tbody.querySelectorAll('tr');
             const isRankSection = section.id === 'rank_category';
+            let sectionHits = 0, sectionTotal = 0;
 
             section.metrics.forEach((metric, i) => {
                 if (!trs[i]) return;
@@ -1162,12 +1189,33 @@
                         if (csvStd && csvStd !== '-' && csvStd.toString().trim() !== '') {
                             tds[2].textContent = formatValue(csvStd);
                         }
-                        tds[3].textContent = formatValue(data.lastWeek);
-                        tds[3].className = getValueClass(data.lastWeek, std);
-                        tds[4].textContent = formatValue(data.fourWkAvg);
-                        tds[4].className = getValueClass(data.fourWkAvg, std);
-                        tds[5].textContent = formatValue(data.twelveMthAvg);
-                        tds[5].className = getValueClass(data.twelveMthAvg, std);
+                        const cls3 = getValueClass(data.lastWeek, std);
+                        const cls4 = getValueClass(data.fourWkAvg, std);
+                        const cls5 = getValueClass(data.twelveMthAvg, std);
+
+                        tds[3].innerHTML = formatValue(data.lastWeek) + getStatusEmoji(cls3);
+                        tds[3].className = cls3;
+                        tds[4].innerHTML = formatValue(data.fourWkAvg) + getStatusEmoji(cls4);
+                        tds[4].className = cls4;
+                        tds[5].innerHTML = formatValue(data.twelveMthAvg) + getStatusEmoji(cls5);
+                        tds[5].className = cls5;
+
+                        // Streak: all 3 periods green = fire on metric name
+                        const nameDiv = tds[0].querySelector('.metric-name');
+                        if (nameDiv) {
+                            // Remove any existing streak
+                            const existing = nameDiv.querySelector('.streak-fire');
+                            if (existing) existing.remove();
+                            if (cls3 === 'val-positive' && cls4 === 'val-positive' && cls5 === 'val-positive') {
+                                nameDiv.insertAdjacentHTML('beforeend', '<span class="streak-fire" title="On fire! All periods above standard">🔥</span>');
+                            }
+                        }
+
+                        // Track health for section badge (only count metrics with a standard)
+                        if (std && std !== '-' && std !== '') {
+                            sectionTotal++;
+                            if (cls3 === 'val-positive') sectionHits++;
+                        }
                     } else {
                         tds[3].textContent = '-';
                         tds[4].textContent = '-';
@@ -1175,6 +1223,9 @@
                     }
                 }
             });
+
+            // Update section health badge
+            updateHealthBadge(section.id, sectionHits, sectionTotal);
 
             // After populating dollar table, calculate totals, sort, and build percentage table
             if (section.assetsSection) {
@@ -1313,6 +1364,25 @@
         }
 
         return 'val-neutral';
+    }
+
+    function getStatusEmoji(cls) {
+        if (cls === 'val-positive') return '<span class="status-emoji">👍</span>';
+        if (cls === 'val-negative') return '<span class="status-emoji">😢</span>';
+        return '';
+    }
+
+    function updateHealthBadge(sectionId, hits, total) {
+        const badge = document.getElementById('health-' + sectionId);
+        if (!badge) return;
+        if (total === 0) { badge.style.display = 'none'; return; }
+        const pct = hits / total;
+        badge.style.display = 'inline-block';
+        badge.textContent = hits + '/' + total + ' on target';
+        if (pct >= 0.8) { badge.className = 'health-badge health-great'; }
+        else if (pct >= 0.5) { badge.className = 'health-badge health-good'; }
+        else if (pct >= 0.25) { badge.className = 'health-badge health-mixed'; }
+        else { badge.className = 'health-badge health-poor'; }
     }
 
     async function fetchData() {
