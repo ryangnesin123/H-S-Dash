@@ -39,6 +39,29 @@
             color: #58a6ff;
         }
 
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            background: #161b22;
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid #30363d;
+            margin-left: 16px;
+        }
+
+        .tab-nav a {
+            padding: 6px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            color: #8b949e;
+            transition: all 0.15s;
+        }
+
+        .tab-nav a:hover { color: #c9d1d9; background: #21262d; }
+        .tab-nav a.active { background: #238636; color: #fff; }
+
         .header-right {
             display: flex;
             align-items: center;
@@ -414,7 +437,13 @@
 </head>
 <body>
     <div class="header">
-        <h1><span>H&S</span> Business Scorecard</h1>
+        <div style="display:flex;align-items:center;">
+            <h1><span>H&S</span> Business Scorecard</h1>
+            <div class="tab-nav">
+                <a href="index.html" class="active">Scorecard</a>
+                <a href="logistics.html">Logistics</a>
+            </div>
+        </div>
         <div class="header-right">
             <div class="sync-status">
                 <div class="sync-dot" id="syncDot"></div>

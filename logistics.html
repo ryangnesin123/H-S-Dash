@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>H&S Logistics Performance</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 700;
+            color: #e1e4e8;
+        }
+
+        .tab-nav {
+            display: flex;
+            gap: 4px;
+            background: #161b22;
+            border-radius: 8px;
+            padding: 3px;
+            border: 1px solid #30363d;
+        }
+
+        .tab-nav a {
+            padding: 6px 16px;
+            border-radius: 6px;
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 500;
+            color: #8b949e;
+            transition: all 0.15s;
+        }
+
+        .tab-nav a:hover { color: #c9d1d9; background: #21262d; }
+        .tab-nav a.active { background: #238636; color: #fff; }
+
+        .sync-info {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: #8b949e;
+        }
+
+        .sync-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #3fb950;
+        }
+
+        .sync-dot.loading {
+            background: #d29922;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: 1px solid #30363d;
+            background: #21262d;
+            color: #c9d1d9;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .btn:hover { background: #30363d; border-color: #484f58; }
+
+        /* Summary cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .summary-card {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .summary-card .label {
+            font-size: 11px;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .summary-card .value {
+            font-size: 24px;
+            font-weight: 700;
+            color: #e1e4e8;
+        }
+
+        .summary-card .sub {
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: 4px;
+        }
+
+        /* 3PL sections */
+        .tpl-section {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .tpl-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px;
+            cursor: pointer;
+            user-select: none;
+            transition: background 0.15s;
+        }
+
+        .tpl-header:hover { background: #1c2129; }
+
+        .tpl-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            color: #e1e4e8;
+        }
+
+        .tpl-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            background: rgba(56, 139, 253, 0.1);
+        }
+
+        .tpl-badges {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .tpl-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+
+        .tpl-badge.processing { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+        .tpl-badge.good { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+        .tpl-badge.bad { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+
+        .chevron {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.2s;
+            color: #484f58;
+        }
+
+        .tpl-section.open .chevron { transform: rotate(180deg); }
+
+        .tpl-body {
+            display: none;
+            padding: 0 18px 18px;
+        }
+
+        .tpl-section.open .tpl-body { display: block; }
+
+        /* Averages table */
+        .avg-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 16px;
+        }
+
+        .avg-table th {
+            text-align: left;
+            padding: 8px 12px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .avg-table td {
+            padding: 10px 12px;
+            font-size: 13px;
+            border-bottom: 1px solid #21262d;
+        }
+
+        .avg-table tr.avg-row td {
+            font-weight: 600;
+            font-size: 18px;
+        }
+
+        .avg-table td.val-good { color: #3fb950; font-weight: 600; }
+        .avg-table td.val-bad { color: #f85149; font-weight: 600; }
+        .avg-table td.val-warn { color: #d29922; font-weight: 600; }
+        .avg-table td.val-neutral { color: #c9d1d9; }
+
+        /* PO detail table */
+        .detail-toggle {
+            font-size: 12px;
+            color: #58a6ff;
+            cursor: pointer;
+            margin-bottom: 8px;
+            display: inline-block;
+        }
+
+        .detail-toggle:hover { text-decoration: underline; }
+
+        .po-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+        }
+
+        .po-table th {
+            text-align: left;
+            padding: 6px 10px;
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+            white-space: nowrap;
+        }
+
+        .po-table td {
+            padding: 6px 10px;
+            border-bottom: 1px solid #21262d;
+            white-space: nowrap;
+        }
+
+        .po-table tr:hover { background: #1c2129; }
+
+        .po-table td.val-good { color: #3fb950; }
+        .po-table td.val-bad { color: #f85149; }
+        .po-table td.val-warn { color: #d29922; }
+
+        .status-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .status-badge.delivered { background: rgba(63, 185, 80, 0.15); color: #3fb950; }
+        .status-badge.in-prep { background: rgba(210, 153, 34, 0.15); color: #d29922; }
+        .status-badge.in-transit { background: rgba(56, 139, 253, 0.15); color: #58a6ff; }
+        .status-badge.pending { background: rgba(139, 148, 158, 0.15); color: #8b949e; }
+        .status-badge.not-shipped { background: rgba(248, 81, 73, 0.15); color: #f85149; }
+
+        .section-divider {
+            font-size: 12px;
+            font-weight: 600;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 16px 0 8px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .copy-btn {
+            padding: 4px 10px;
+            border-radius: 4px;
+            border: 1px solid #30363d;
+            background: #21262d;
+            color: #8b949e;
+            font-size: 11px;
+            cursor: pointer;
+            float: right;
+        }
+
+        .copy-btn:hover { background: #30363d; color: #c9d1d9; }
+
+        .loading-msg {
+            text-align: center;
+            padding: 60px 20px;
+            color: #8b949e;
+            font-size: 14px;
+        }
+
+        .sla-label {
+            font-size: 11px;
+            color: #8b949e;
+            margin-top: 2px;
+        }
+
+        @media (max-width: 768px) {
+            body { padding: 12px; }
+            .po-table, .avg-table { font-size: 11px; }
+            .summary-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <h1>H&S Logistics Performance</h1>
+            <div class="tab-nav">
+                <a href="index.html">Scorecard</a>
+                <a href="logistics.html" class="active">Logistics</a>
+            </div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px;">
+            <div class="sync-info">
+                <div class="sync-dot loading" id="syncDot"></div>
+                <span id="syncText">Loading...</span>
+            </div>
+            <button class="btn" onclick="fetchData()">Refresh</button>
+        </div>
+    </div>
+
+    <div class="summary-grid" id="summaryGrid">
+        <div class="summary-card"><div class="label">Loading...</div><div class="value">-</div></div>
+    </div>
+
+    <div id="tplContainer">
+        <div class="loading-msg">Loading data from Airtable...</div>
+    </div>
+
+    <script>
+    // Token stored in localStorage for security (not in source code)
+    function getAirtableToken() {
+        let token = localStorage.getItem('airtable_token');
+        if (!token) {
+            token = prompt('Enter your Airtable Personal Access Token (starts with pat...):');
+            if (token && token.startsWith('pat')) {
+                localStorage.setItem('airtable_token', token);
+            }
+        }
+        return token;
+    }
+    const AIRTABLE_TOKEN = getAirtableToken();
+    const BASE_ID = 'appE2kWbrZ0nv72DY';
+    const TABLE_ID = 'tblQ7VHMsVvwzlfm2';
+
+    // SLA targets (days) - adjust as needed
+    const SLA = {
+        'AMZ PREP': { arrival: 14, ship: 7 },
+        'AMZ PREP Nevada': { arrival: 14, ship: 7 },
+        'BUBBLE BOX PREP': { arrival: 14, ship: 7 },
+        'CALI PREP CENTER': { arrival: 14, ship: 7 },
+        'UPSTATE PREP': { arrival: 14, ship: 7 },
+    };
+
+    // Normalize 3PL names (merge AMZ PREP variants)
+    function normalize3PL(name) {
+        if (!name) return null;
+        if (name.startsWith('N/A') || name === 'AWD') return null;
+        if (name === 'AMZ PREP Nevada' || name === 'AMZ PREP Alabama') return 'AMZ PREP';
+        return name;
+    }
+
+    function getDaysDiff(dateA, dateB) {
+        if (!dateA || !dateB) return null;
+        const a = new Date(dateA);
+        const b = new Date(dateB);
+        return Math.round((b - a) / (1000 * 60 * 60 * 24));
+    }
+
+    function formatCurrency(val) {
+        if (!val && val !== 0) return '-';
+        return '$' + Math.round(val).toLocaleString();
+    }
+
+    function getStatusClass(status) {
+        if (!status) return 'pending';
+        const s = status.toLowerCase();
+        if (s.includes('delivered')) return 'delivered';
+        if (s.includes('prep')) return 'in-prep';
+        if (s.includes('transit')) return 'in-transit';
+        if (s.includes('pending') || s.includes('pick up')) return 'pending';
+        if (s.includes('not shipped')) return 'not-shipped';
+        return 'pending';
+    }
+
+    function getDaysClass(days, slaTarget) {
+        if (days === null || days === undefined) return 'val-neutral';
+        if (slaTarget && days > slaTarget * 1.5) return 'val-bad';
+        if (slaTarget && days > slaTarget) return 'val-warn';
+        if (slaTarget && days <= slaTarget) return 'val-good';
+        return 'val-neutral';
+    }
+
+    function weightedAvg(records, field, weightField) {
+        let totalWeight = 0;
+        let weightedSum = 0;
+        records.forEach(r => {
+            const val = r[field];
+            const weight = r[weightField] || 0;
+            if (val !== null && val !== undefined && !isNaN(val) && weight > 0) {
+                weightedSum += val * weight;
+                totalWeight += weight;
+            }
+        });
+        return totalWeight > 0 ? Math.round((weightedSum / totalWeight) * 10) / 10 : null;
+    }
+
+    function isInPeriod(dateStr, monthsBack) {
+        if (!dateStr) return false;
+        const d = new Date(dateStr);
+        const now = new Date();
+        const cutoff = new Date(now);
+        cutoff.setMonth(cutoff.getMonth() - monthsBack);
+        return d >= cutoff && d <= now;
+    }
+
+    function isCurrentlyProcessing(record) {
+        const phase = record.Phase;
+        const outbound = record['Outbound Status (FBA)'] || '';
+        // Currently processing = at 3PL but not yet delivered to Amazon
+        return phase === 'Outbound' && outbound !== 'Delivered';
+    }
+
+    async function fetchAllRecords() {
+        let allRecords = [];
+        let offset = null;
+        do {
+            let url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?maxRecords=100`;
+            if (offset) url += `&offset=${offset}`;
+            const resp = await fetch(url, {
+                headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
+            });
+            const data = await resp.json();
+            if (data.error) throw new Error(data.error.message);
+            allRecords = allRecords.concat(data.records);
+            offset = data.offset;
+        } while (offset);
+        return allRecords;
+    }
+
+    function processRecords(rawRecords) {
+        return rawRecords.map(r => {
+            const f = r.fields;
+            const threePL = normalize3PL(f['3PL']);
+            if (!threePL) return null;
+
+            // Calculate days if not already in the data
+            let payTo3PL = f['Payment Date to ATA 3PL'];
+            if (typeof payTo3PL === 'object') payTo3PL = null;
+            if (payTo3PL === null && f['Date of Full Payment'] && f['ATA 3PL']) {
+                payTo3PL = getDaysDiff(f['Date of Full Payment'], f['ATA 3PL']);
+            }
+
+            let threePLToFBA = f['ATA 3PL to Shipped FBA'];
+            if (typeof threePLToFBA === 'object') threePLToFBA = null;
+            if (threePLToFBA === null && f['ATA 3PL'] && f['FBA Shipped Date']) {
+                threePLToFBA = getDaysDiff(f['ATA 3PL'], f['FBA Shipped Date']);
+            }
+
+            // Days at 3PL so far (if still processing)
+            let daysAt3PLSoFar = null;
+            if (f['ATA 3PL'] && !f['FBA Shipped Date']) {
+                daysAt3PLSoFar = getDaysDiff(f['ATA 3PL'], new Date().toISOString().split('T')[0]);
+            }
+
+            return {
+                po: f['PO N\u00B0'] || f['PO Description'] || '',
+                description: f['PO Description'] || '',
+                threePL: threePL,
+                threePLRaw: f['3PL'] || '',
+                supplier: f['Supplier'] || '',
+                brand: (f['Brand'] || []).join(', '),
+                phase: f['Phase'] || '',
+                outboundStatus: f['Outbound Status (FBA)'] || '',
+                inboundStatus: f['Inbound \nShipment Status'] || '',
+                orderQty: f['Order Qty'] || 0,
+                totalValue: f['Total PO Value'] || 0,
+                landedCost: f['Total PO Landed Cost'] || 0,
+                paymentDate: f['Date of Full Payment'] || '',
+                ata3PL: f['ATA 3PL'] || '',
+                fbaShipped: f['FBA Shipped Date'] || '',
+                payTo3PLDays: payTo3PL,
+                threePLToFBADays: threePLToFBA,
+                daysAt3PLSoFar: daysAt3PLSoFar,
+                grd: f['GRD'] || '',
+                reconciliation: f['Reconciliation Result'] || '',
+                piecesRecon: f['Pieces Reconciliation'] || '',
+            };
+        }).filter(r => r !== null);
+    }
+
+    function groupBy3PL(records) {
+        const groups = {};
+        records.forEach(r => {
+            if (!groups[r.threePL]) groups[r.threePL] = [];
+            groups[r.threePL].push(r);
+        });
+        return groups;
+    }
+
+    function renderSummary(records) {
+        const processing = records.filter(r => isCurrentlyProcessing(r));
+        const totalValueProcessing = processing.reduce((s, r) => s + r.totalValue, 0);
+        const totalPOs = records.length;
+        const completedPOs = records.filter(r => r.outboundStatus === 'Delivered').length;
+
+        const avgPayTo3PL = weightedAvg(records.filter(r => r.payTo3PLDays !== null), 'payTo3PLDays', 'totalValue');
+        const avg3PLToFBA = weightedAvg(records.filter(r => r.threePLToFBADays !== null), 'threePLToFBADays', 'totalValue');
+
+        document.getElementById('summaryGrid').innerHTML = `
+            <div class="summary-card">
+                <div class="label">Currently at 3PLs</div>
+                <div class="value">${processing.length}</div>
+                <div class="sub">${formatCurrency(totalValueProcessing)} in value</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Completed POs</div>
+                <div class="value">${completedPOs}/${totalPOs}</div>
+                <div class="sub">Delivered to Amazon FBA</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Avg Payment to 3PL</div>
+                <div class="value">${avgPayTo3PL !== null ? avgPayTo3PL + ' days' : '-'}</div>
+                <div class="sub">Weighted by PO value</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">Avg 3PL to FBA Ship</div>
+                <div class="value">${avg3PLToFBA !== null ? avg3PLToFBA + ' days' : '-'}</div>
+                <div class="sub">Weighted by PO value</div>
+            </div>
+        `;
+    }
+
+    function render3PLSection(name, records, container) {
+        const sla = SLA[name] || { arrival: 14, ship: 7 };
+
+        // Split records into time periods
+        const processing = records.filter(r => isCurrentlyProcessing(r));
+        const trail3m = records.filter(r => r.fbaShipped && isInPeriod(r.fbaShipped, 3));
+        const trail12m = records.filter(r => r.fbaShipped && isInPeriod(r.fbaShipped, 12));
+
+        // Weighted averages
+        const avgPayProcessing = weightedAvg(processing.filter(r => r.payTo3PLDays !== null), 'payTo3PLDays', 'totalValue');
+        const avg3PLProcessing = weightedAvg(processing, 'daysAt3PLSoFar', 'totalValue');
+
+        const avgPay3m = weightedAvg(trail3m.filter(r => r.payTo3PLDays !== null), 'payTo3PLDays', 'totalValue');
+        const avg3PL3m = weightedAvg(trail3m.filter(r => r.threePLToFBADays !== null), 'threePLToFBADays', 'totalValue');
+
+        const avgPay12m = weightedAvg(trail12m.filter(r => r.payTo3PLDays !== null), 'payTo3PLDays', 'totalValue');
+        const avg3PL12m = weightedAvg(trail12m.filter(r => r.threePLToFBADays !== null), 'threePLToFBADays', 'totalValue');
+
+        // Badge for header
+        let badgeHTML = '';
+        if (processing.length > 0) {
+            badgeHTML += `<span class="tpl-badge processing">${processing.length} processing</span>`;
+        }
+        if (avg3PL12m !== null) {
+            const cls = avg3PL12m <= sla.ship ? 'good' : 'bad';
+            badgeHTML += `<span class="tpl-badge ${cls}">${avg3PL12m}d avg ship (12m)</span>`;
+        }
+
+        const sectionId = name.replace(/\s+/g, '_').toLowerCase();
+        const section = document.createElement('div');
+        section.className = 'tpl-section';
+        section.id = `tpl-${sectionId}`;
+
+        function fmtDays(v) { return v !== null ? v : '-'; }
+        function daysCls(v, target) { return getDaysClass(v, target); }
+
+        section.innerHTML = `
+            <div class="tpl-header" onclick="this.parentElement.classList.toggle('open')">
+                <div class="tpl-title">
+                    <div class="tpl-icon">\u{1F4E6}</div>
+                    ${name}
+                    <div class="tpl-badges">${badgeHTML}</div>
+                </div>
+                <svg class="chevron" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z"/>
+                </svg>
+            </div>
+            <div class="tpl-body">
+                <table class="avg-table">
+                    <thead>
+                        <tr>
+                            <th>Metric</th>
+                            <th>Currently Processing</th>
+                            <th>Trailing 3 Months</th>
+                            <th>Trailing 12 Months</th>
+                            <th>SLA Target</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="avg-row">
+                            <td>Payment to Arrive at 3PL<div class="sla-label">Weighted avg days</div></td>
+                            <td class="${daysCls(avgPayProcessing, sla.arrival)}">${fmtDays(avgPayProcessing)}</td>
+                            <td class="${daysCls(avgPay3m, sla.arrival)}">${fmtDays(avgPay3m)}</td>
+                            <td class="${daysCls(avgPay12m, sla.arrival)}">${fmtDays(avgPay12m)}</td>
+                            <td class="val-neutral">${sla.arrival} days</td>
+                        </tr>
+                        <tr class="avg-row">
+                            <td>Arrive at 3PL to Ship FBA<div class="sla-label">Weighted avg days</div></td>
+                            <td class="${daysCls(avg3PLProcessing, sla.ship)}">${fmtDays(avg3PLProcessing)}${avg3PLProcessing !== null ? ' (so far)' : ''}</td>
+                            <td class="${daysCls(avg3PL3m, sla.ship)}">${fmtDays(avg3PL3m)}</td>
+                            <td class="${daysCls(avg3PL12m, sla.ship)}">${fmtDays(avg3PL12m)}</td>
+                            <td class="val-neutral">${sla.ship} days</td>
+                        </tr>
+                        <tr>
+                            <td style="color:#8b949e"># of POs</td>
+                            <td>${processing.length}</td>
+                            <td>${trail3m.length}</td>
+                            <td>${trail12m.length}</td>
+                            <td></td>
+                        </tr>
+                        <tr>
+                            <td style="color:#8b949e">Total Value</td>
+                            <td>${formatCurrency(processing.reduce((s,r) => s + r.totalValue, 0))}</td>
+                            <td>${formatCurrency(trail3m.reduce((s,r) => s + r.totalValue, 0))}</td>
+                            <td>${formatCurrency(trail12m.reduce((s,r) => s + r.totalValue, 0))}</td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                ${renderPOGroup('Currently Processing', processing, sla, sectionId + '_processing', true)}
+                ${renderPOGroup('Completed - Trailing 3 Months', trail3m, sla, sectionId + '_3m', false)}
+                ${renderPOGroup('Completed - Trailing 12 Months', trail12m, sla, sectionId + '_12m', false)}
+            </div>
+        `;
+
+        container.appendChild(section);
+    }
+
+    function renderPOGroup(title, records, sla, groupId, isProcessing) {
+        if (records.length === 0) return `<div class="section-divider">${title} (0 POs)</div>`;
+
+        const rows = records.map(r => {
+            const payDays = r.payTo3PLDays;
+            const shipDays = isProcessing ? r.daysAt3PLSoFar : r.threePLToFBADays;
+            const status = isProcessing ? (r.outboundStatus || r.inboundStatus || 'Processing') : 'Delivered';
+            const statusCls = getStatusClass(status);
+
+            return `<tr>
+                <td>${r.po}</td>
+                <td>${r.supplier}</td>
+                <td>${r.brand}</td>
+                <td style="text-align:right">${r.orderQty}</td>
+                <td style="text-align:right">${formatCurrency(r.totalValue)}</td>
+                <td>${r.paymentDate || '-'}</td>
+                <td>${r.ata3PL || '-'}</td>
+                <td>${isProcessing ? '-' : (r.fbaShipped || '-')}</td>
+                <td class="${getDaysClass(payDays, sla.arrival)}" style="text-align:right">${payDays !== null ? payDays : '-'}</td>
+                <td class="${getDaysClass(shipDays, sla.ship)}" style="text-align:right">${shipDays !== null ? shipDays + (isProcessing ? '*' : '') : '-'}</td>
+                <td><span class="status-badge ${statusCls}">${status}</span></td>
+            </tr>`;
+        }).join('');
+
+        return `
+            <div class="section-divider">
+                ${title} (${records.length} POs)
+                <button class="copy-btn" onclick="copyTable('table_${groupId}')">Copy for Email</button>
+            </div>
+            <span class="detail-toggle" onclick="document.getElementById('detail_${groupId}').style.display = document.getElementById('detail_${groupId}').style.display === 'none' ? 'block' : 'none'">
+                Show/Hide Details
+            </span>
+            <div id="detail_${groupId}" style="display:${isProcessing ? 'block' : 'none'}; overflow-x:auto;">
+                <table class="po-table" id="table_${groupId}">
+                    <thead>
+                        <tr>
+                            <th>PO#</th>
+                            <th>Supplier</th>
+                            <th>Brand</th>
+                            <th>Qty</th>
+                            <th>Value</th>
+                            <th>Paid</th>
+                            <th>Arrived 3PL</th>
+                            <th>Shipped FBA</th>
+                            <th>Pay\u2192 3PL</th>
+                            <th>3PL\u2192 FBA</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    function copyTable(tableId) {
+        const table = document.getElementById(tableId);
+        if (!table) return;
+
+        // Build tab-separated text for pasting into email/sheets
+        const rows = [];
+        table.querySelectorAll('tr').forEach(tr => {
+            const cells = [];
+            tr.querySelectorAll('th, td').forEach(td => {
+                cells.push(td.textContent.trim());
+            });
+            rows.push(cells.join('\t'));
+        });
+
+        navigator.clipboard.writeText(rows.join('\n')).then(() => {
+            const btn = event.target;
+            btn.textContent = 'Copied!';
+            setTimeout(() => { btn.textContent = 'Copy for Email'; }, 2000);
+        });
+    }
+
+    async function fetchData() {
+        const dot = document.getElementById('syncDot');
+        const text = document.getElementById('syncText');
+        dot.classList.add('loading');
+        text.textContent = 'Loading...';
+
+        try {
+            const raw = await fetchAllRecords();
+            const records = processRecords(raw);
+            const groups = groupBy3PL(records);
+
+            renderSummary(records);
+
+            const container = document.getElementById('tplContainer');
+            container.innerHTML = '';
+
+            // Sort 3PLs by number of records (most first)
+            const sortedNames = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+            sortedNames.forEach(name => {
+                render3PLSection(name, groups[name], container);
+            });
+
+            dot.classList.remove('loading');
+            text.textContent = `Live \u00B7 ${new Date().toLocaleTimeString()}`;
+
+        } catch (err) {
+            dot.classList.remove('loading');
+            dot.style.background = '#f85149';
+            text.textContent = 'Error: ' + err.message;
+            console.error(err);
+        }
+    }
+
+    // Initial load
+    fetchData();
+
+    // Auto-refresh every 5 minutes
+    setInterval(fetchData, 5 * 60 * 1000);
+    </script>
+</body>
+</html>
