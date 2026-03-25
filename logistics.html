@@ -448,17 +448,15 @@
     }
 
     function isCurrentlyProcessing(record) {
-        const phase = record.Phase;
-        const outbound = record['Outbound Status (FBA)'] || '';
-        // Currently processing = at 3PL but not yet delivered to Amazon
-        return phase === 'Outbound' && outbound !== 'Delivered';
+        // Currently processing = arrived at 3PL but not yet shipped to FBA
+        return record.ata3PL && !record.fbaShipped;
     }
 
     async function fetchAllRecords() {
         let allRecords = [];
         let offset = null;
         do {
-            let url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?maxRecords=100`;
+            let url = `https://api.airtable.com/v0/${BASE_ID}/${TABLE_ID}?pageSize=100`;
             if (offset) url += `&offset=${offset}`;
             const resp = await fetch(url, {
                 headers: { 'Authorization': `Bearer ${AIRTABLE_TOKEN}` }
